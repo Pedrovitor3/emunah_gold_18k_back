@@ -1,0 +1,47 @@
+{
+  "name": "emunah-gold-18k-backend",
+  "version": "1.0.0",
+  "description": "Backend para o site de vendas Emunah Gold 18K",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "nodemon --exec ts-node src/server.ts",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "echo \"Linting not configured yet\"",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "fastify",
+    "typescript",
+    "postgresql",
+    "ecommerce",
+    "gold"
+  ],
+  "author": "Emunah Gold 18K",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.893.0",
+    "@aws-sdk/lib-storage": "^3.893.0",
+    "@fastify/cors": "^11.1.0",
+    "@fastify/jwt": "^9.1.0",
+    "@fastify/multipart": "^9.2.1",
+    "aws-sdk": "^2.1692.0",
+    "bcryptjs": "^3.0.2",
+    "dotenv": "^17.2.1",
+    "fastify": "^5.4.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.16.3",
+    "reflect-metadata": "^0.2.2",
+    "typeorm": "^0.3.25"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^24.2.0",
+    "@types/pg": "^8.15.5",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  }
+}
