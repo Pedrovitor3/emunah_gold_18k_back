@@ -1,8 +1,3 @@
-/**
- * Rotas de upload de arquivos
- * Emunah Gold 18K - Backend
- */
-
 import { FastifyInstance } from "fastify";
 import {
   uploadSingleFile,
@@ -13,34 +8,22 @@ import {
 } from "../controllers/uploadController";
 
 /**
- * Plugin de rotas de upload
+ * Rotas de upload de arquivos
+ * Emunah Gold 18K - Backend
  */
 export default async function uploadRoutes(fastify: FastifyInstance) {
-  const deleteFileSchema = {
-    params: {
-      type: "object",
-      required: ["filename"],
-      properties: {
-        filename: { type: "string", minLength: 1 },
-      },
-    },
-  };
+  // Health check da conexão S3
+  fastify.get("/health", healthCheck);
 
-  const getFileInfoSchema = {
-    params: {
-      type: "object",
-      required: ["filename"],
-      properties: {
-        filename: { type: "string", minLength: 1 },
-      },
-    },
-  };
+  // Upload de arquivo único
+  fastify.post("/single", uploadSingleFile);
 
-  // Rotas de upload (sem schema para multipart/form-data)
-  fastify.post("/single", healthCheck);
+  // Upload de múltiplos arquivos
   fastify.post("/multiple", uploadMultipleFiles);
 
-  // Rotas de gerenciamento
-  fastify.delete("/:filename", { schema: deleteFileSchema }, deleteFile);
-  fastify.get("/info/:filename", { schema: getFileInfoSchema }, getFileInfo);
+  // Deletar arquivo
+  fastify.delete("/:filename", deleteFile);
+
+  // Obter informações do arquivo
+  fastify.get("/:filename", getFileInfo);
 }

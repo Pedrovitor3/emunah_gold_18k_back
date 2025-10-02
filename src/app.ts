@@ -3,10 +3,11 @@
  * Emunah Gold 18K - Backend
  */
 
-import Fastify, { FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import dotenv from "dotenv";
+import { FastifyRequest, FastifyReply, FastifyError } from "fastify";
+import Fastify from "fastify";
 
 // Importar rotas
 import authRoutes from "./routes/auth";
@@ -18,8 +19,11 @@ import { initializeDatabase } from "./config/database";
 import categoryRoutes from "./routes/category";
 import productImageRoutes from "./routes/productImage";
 import uploadRoutes from "./routes/upload";
-
-// Importar configuração do banco
+import { pipeline } from "stream";
+import type { FastifyInstance } from "fastify";
+const fs = require("fs");
+const util = require("util");
+const pump = util.promisify(pipeline);
 
 // Carregar variáveis de ambiente
 dotenv.config();
@@ -30,7 +34,7 @@ dotenv.config();
 const createApp = async (): Promise<FastifyInstance> => {
   // Criar instância do Fastify com configurações
   const fastify = Fastify({
-    logger: process.env.NODE_ENV === "production" ? false : true,
+    logger: true,
   });
 
   // Registrar plugins
@@ -42,50 +46,67 @@ const createApp = async (): Promise<FastifyInstance> => {
 
   await fastify.register(multipart, {
     limits: {
-      fileSize: 5 * 1024 * 1024, // 5MB
+      fieldNameSize: 100,
+      fieldSize: 100,
+      fields: 10,
+      fileSize: 10000000, // 10MB
+      files: 5,
+      headerPairs: 2000,
     },
+    attachFieldsToBody: false, // Importante!
   });
-
   // Middleware global para logging de requisições
-  fastify.addHook("onRequest", async (request, reply) => {
-    request.log.info(
-      {
-        method: request.method,
-        url: request.url,
-        ip: request.ip,
-        userAgent: request.headers["user-agent"],
-      },
-      "Incoming request"
-    );
-  });
+  fastify.addHook(
+    "onRequest",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      request.log.info(
+        {
+          method: request.method,
+          url: request.url,
+          ip: request.ip,
+          userAgent: request.headers["user-agent"],
+        },
+        "Incoming request"
+      );
+    }
+  );
 
   // Middleware global para tratamento de erros
-  fastify.setErrorHandler(async (error, request, reply) => {
-    request.log.error(error, "Unhandled error");
+  fastify.setErrorHandler(
+    async (
+      error: FastifyError,
+      request: FastifyRequest,
+      reply: FastifyReply
+    ) => {
+      request.log.error(error, "Unhandled error");
 
-    // Não expor detalhes do erro em produção
-    const message =
-      process.env.NODE_ENV === "production"
-        ? "Erro interno do servidor"
-        : error.message;
+      // Não expor detalhes do erro em produção
+      const message =
+        process.env.NODE_ENV === "production"
+          ? "Erro interno do servidor"
+          : error.message;
 
-    reply.status(500).send({
-      success: false,
-      error: message,
-    });
-  });
+      reply.status(500).send({
+        success: false,
+        error: message,
+      });
+    }
+  );
 
   // Rota de health check
-  fastify.get("/health", async (request, reply) => {
-    const dbConnected = await initializeDatabase();
+  fastify.get(
+    "/health",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const dbConnected = await initializeDatabase();
 
-    return {
-      status: "ok",
-      timestamp: new Date().toISOString(),
-      database: dbConnected ? "connected" : "disconnected",
-      version: process.env.npm_package_version || "1.0.0",
-    };
-  });
+      return {
+        status: "ok",
+        timestamp: new Date().toISOString(),
+        database: dbConnected ? "connected" : "disconnected",
+        version: process.env.npm_package_version || "1.0.0",
+      };
+    }
+  );
 
   // Registrar rotas da API
   await fastify.register(authRoutes, { prefix: "/auth" });
@@ -98,13 +119,18 @@ const createApp = async (): Promise<FastifyInstance> => {
   await fastify.register(uploadRoutes, { prefix: "/upload" });
 
   // Rota 404 personalizada
-  fastify.setNotFoundHandler(async (request, reply) => {
-    reply.status(404).send({
-      success: false,
-      error: "Rota não encontrada",
-      path: request.url,
-    });
-  });
+  fastify.setNotFoundHandler(
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      reply.status(404).send({
+        success: false,
+        error: "Rota não encontrada",
+        path: request.url,
+      });
+    }
+  );
+
+  // REMOVE the fastify.listen() call from here!
+  // It should only be called in server.ts
 
   return fastify;
 };

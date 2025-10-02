@@ -24,9 +24,7 @@ const s3Client = new S3Client({
 });
 
 const BUCKET_NAME =
-  process.env.BUCKET_NAME ||
-  process.env.AWS_BUCKET_NAME ||
-  "emunah-gold-bucket";
+  process.env.S3_BUCKET || process.env.AWS_S3_BUCKET || "emunah-gold-bucket";
 
 // Validação das variáveis de ambiente obrigatórias
 const validateEnvironment = () => {
@@ -99,7 +97,7 @@ const generateUniqueFileName = (
 };
 
 // Upload para S3
-const uploadToS3 = async (
+export const uploadToS3 = async (
   fileBuffer: Buffer,
   filename: string,
   mimetype: string,
@@ -107,33 +105,51 @@ const uploadToS3 = async (
 ) => {
   const uploadParams = {
     Bucket: BUCKET_NAME,
-    Key: filename,
+    Key: filename.replace(/^\/+/, ""), // remove leading slashes por segurança
     Body: fileBuffer,
     ContentType: mimetype,
     ACL: "public-read" as const,
     Metadata: {
       originalName,
       uploadedAt: new Date().toISOString(),
-      size: fileBuffer.length.toString(),
+      size: String(fileBuffer.length),
     },
   };
 
   try {
     const command = new PutObjectCommand(uploadParams);
-    await s3Client.send(command);
+    const result = await s3Client.send(command);
 
+    // Resultado com metadados úteis
     const fileUrl = `https://${BUCKET_NAME}.s3.${
       process.env.AWS_REGION || "us-east-1"
-    }.amazonaws.com/${filename}`;
+    }.amazonaws.com/${uploadParams.Key}`;
 
     return {
       success: true,
       url: fileUrl,
-      key: filename,
+      key: uploadParams.Key,
+      raw: result,
     };
-  } catch (error) {
-    console.error("Erro no upload S3:", error);
-    throw new Error("Falha no upload para S3");
+  } catch (error: any) {
+    // Log detalhado — pega propriedades não-enumeráveis também
+    try {
+      const full = Object.getOwnPropertyNames(error).reduce((acc: any, k) => {
+        acc[k] = (error as any)[k];
+        return acc;
+      }, {} as any);
+      console.error("Erro no upload S3 - detalhes:", full);
+    } catch (e) {
+      console.error("Erro ao serializar erro S3:", e);
+    }
+
+    // Tente extrair campos comuns do erro AWS SDK v3
+    const errorCode = error?.name || error?.Code || error?.code;
+    const errorMessage =
+      error?.message || error?.Message || JSON.stringify(error);
+
+    // Re-lançar com detalhe (ou envie no response)
+    throw new Error(`Falha no upload para S3: [${errorCode}] ${errorMessage}`);
   }
 };
 
