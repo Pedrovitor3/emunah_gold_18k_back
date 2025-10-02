@@ -25,6 +25,7 @@ const s3Client = new S3Client({
 
 const BUCKET_NAME =
   process.env.S3_BUCKET || process.env.AWS_S3_BUCKET || "emunah-gold-bucket";
+const REGION = process.env.AWS_REGION || "eu-north-1";
 
 // Validação das variáveis de ambiente obrigatórias
 const validateEnvironment = () => {
@@ -103,12 +104,13 @@ export const uploadToS3 = async (
   mimetype: string,
   originalName: string
 ) => {
-  const uploadParams = {
+  const Key = filename.replace(/^\/+/, "");
+
+  const params: any = {
     Bucket: BUCKET_NAME,
-    Key: filename.replace(/^\/+/, ""), // remove leading slashes por segurança
+    Key,
     Body: fileBuffer,
     ContentType: mimetype,
-    ACL: "public-read" as const,
     Metadata: {
       originalName,
       uploadedAt: new Date().toISOString(),
@@ -116,40 +118,29 @@ export const uploadToS3 = async (
     },
   };
 
+  // Se o bucket exigir server-side encryption
+  if (process.env.S3_SERVER_SIDE_ENCRYPTION) {
+    params.ServerSideEncryption = process.env.S3_SERVER_SIDE_ENCRYPTION; // 'AES256' ou 'aws:kms'
+    if (process.env.S3_KMS_KEY_ID)
+      params.SSEKMSKeyId = process.env.S3_KMS_KEY_ID;
+  }
+
   try {
-    const command = new PutObjectCommand(uploadParams);
-    const result = await s3Client.send(command);
+    const cmd = new PutObjectCommand(params);
+    const res = await s3Client.send(cmd);
 
-    // Resultado com metadados úteis
-    const fileUrl = `https://${BUCKET_NAME}.s3.${
-      process.env.AWS_REGION || "us-east-1"
-    }.amazonaws.com/${uploadParams.Key}`;
+    const url = `https://${BUCKET_NAME}.s3.${REGION}.amazonaws.com/${encodeURIComponent(
+      Key
+    )}`;
 
-    return {
-      success: true,
-      url: fileUrl,
-      key: uploadParams.Key,
-      raw: result,
-    };
-  } catch (error: any) {
-    // Log detalhado — pega propriedades não-enumeráveis também
-    try {
-      const full = Object.getOwnPropertyNames(error).reduce((acc: any, k) => {
-        acc[k] = (error as any)[k];
-        return acc;
-      }, {} as any);
-      console.error("Erro no upload S3 - detalhes:", full);
-    } catch (e) {
-      console.error("Erro ao serializar erro S3:", e);
-    }
-
-    // Tente extrair campos comuns do erro AWS SDK v3
-    const errorCode = error?.name || error?.Code || error?.code;
-    const errorMessage =
-      error?.message || error?.Message || JSON.stringify(error);
-
-    // Re-lançar com detalhe (ou envie no response)
-    throw new Error(`Falha no upload para S3: [${errorCode}] ${errorMessage}`);
+    return { success: true, url, key: Key, raw: res };
+  } catch (err: any) {
+    console.error("Erro no upload S3:", err);
+    throw new Error(
+      `Falha no upload para S3: [${err?.name || "Unknown"}] ${
+        err?.message || err
+      }`
+    );
   }
 };
 
