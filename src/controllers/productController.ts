@@ -1,9 +1,8 @@
-import { AppDataSource } from '../config/database';
-import { Product } from '../models/Product';
-import { Category } from '../models/Category';
-import { ProductImage } from '../models/ProductImage';
-import { FastifyReply, FastifyRequest } from 'fastify';
-import { PaginatedResponse } from '../models/types';
+import { AppDataSource } from "../config/database";
+import { Product } from "../models/Product";
+import { Category } from "../models/Category";
+import { FastifyReply, FastifyRequest } from "fastify";
+import { PaginatedResponse } from "../models/types";
 
 interface ProductSearchParams {
   page?: string;
@@ -16,18 +15,17 @@ interface DeleteProductParams {
   id: string;
 }
 
-
 export const getProducts = async (
   request: FastifyRequest<{ Querystring: ProductSearchParams }>,
   reply: FastifyReply
 ) => {
   try {
     const {
-      page = '1',
-      limit = '12',
+      page = "1",
+      limit = "12",
       category,
       featured,
-      search
+      search,
     } = request.query;
 
     const pageNum = parseInt(page);
@@ -36,26 +34,29 @@ export const getProducts = async (
     const productRepo = AppDataSource.getRepository(Product);
 
     const queryBuilder = productRepo
-      .createQueryBuilder('p')
-      .leftJoinAndSelect('p.category', 'c')
-      .leftJoinAndSelect('p.images', 'pi')
-      .where('p.is_active = :active', { active: true });
+      .createQueryBuilder("p")
+      .leftJoinAndSelect("p.category", "c")
+      .leftJoinAndSelect("p.images", "pi")
+      .where("p.is_active = :active", { active: true });
 
     if (category) {
-      queryBuilder.andWhere('c.slug = :category', { category });
+      queryBuilder.andWhere("c.slug = :category", { category });
     }
 
-    if (featured === 'true') {
-      queryBuilder.andWhere('p.featured = :featured', { featured: true });
+    if (featured === "true") {
+      queryBuilder.andWhere("p.featured = :featured", { featured: true });
     }
 
     if (search) {
-      queryBuilder.andWhere('(p.name ILIKE :search OR p.description ILIKE :search)', { search: `%${search}%` });
+      queryBuilder.andWhere(
+        "(p.name ILIKE :search OR p.description ILIKE :search)",
+        { search: `%${search}%` }
+      );
     }
 
     const [products, total] = await queryBuilder
-      .orderBy('p.featured', 'DESC')
-      .addOrderBy('p.created_at', 'DESC')
+      .orderBy("p.featured", "DESC")
+      .addOrderBy("p.created_at", "DESC")
       .skip((pageNum - 1) * limitNum)
       .take(limitNum)
       .getManyAndCount();
@@ -69,14 +70,16 @@ export const getProducts = async (
         page: pageNum,
         limit: limitNum,
         total,
-        totalPages
-      }
+        totalPages,
+      },
     };
 
     reply.send(response);
   } catch (error) {
-    console.error('Erro ao buscar produtos:', error);
-    reply.status(500).send({ success: false, error: 'Erro interno do servidor' });
+    console.error("Erro ao buscar produtos:", error);
+    reply
+      .status(500)
+      .send({ success: false, error: "Erro interno do servidor" });
   }
 };
 
@@ -89,37 +92,46 @@ export const getProductById = async (
 
     const product = await productRepo.findOne({
       where: { id: request.params.id, is_active: true },
-      relations: ['category', 'images']
+      relations: ["category", "images"],
     });
 
     if (!product) {
-      return reply.status(404).send({ success: false, error: 'Produto não encontrado' });
+      return reply
+        .status(404)
+        .send({ success: false, error: "Produto não encontrado" });
     }
 
     reply.send({ success: true, data: product });
   } catch (error) {
-    console.error('Erro ao buscar produto:', error);
-    reply.status(500).send({ success: false, error: 'Erro interno do servidor' });
+    console.error("Erro ao buscar produto:", error);
+    reply
+      .status(500)
+      .send({ success: false, error: "Erro interno do servidor" });
   }
 };
-export const getCategories = async (_request: FastifyRequest, reply: FastifyReply) => {
+export const getCategories = async (
+  _request: FastifyRequest,
+  reply: FastifyReply
+) => {
   try {
     const categoryRepo = AppDataSource.getRepository(Category);
 
     const categories = await categoryRepo
-      .createQueryBuilder('c')
-      .leftJoinAndSelect('c.products', 'p', 'p.is_active = true')
-      .where('c.is_active = true')
-      .loadRelationCountAndMap('c.product_count', 'c.products', 'prod', qb =>
-        qb.andWhere('prod.is_active = true')
+      .createQueryBuilder("c")
+      .leftJoinAndSelect("c.products", "p", "p.is_active = true")
+      .where("c.is_active = true")
+      .loadRelationCountAndMap("c.product_count", "c.products", "prod", (qb) =>
+        qb.andWhere("prod.is_active = true")
       )
-      .orderBy('c.name', 'ASC')
+      .orderBy("c.name", "ASC")
       .getMany();
 
     reply.send({ success: true, data: categories });
   } catch (error) {
-    console.error('Erro ao buscar categorias:', error);
-    reply.status(500).send({ success: false, error: 'Erro interno do servidor' });
+    console.error("Erro ao buscar categorias:", error);
+    reply
+      .status(500)
+      .send({ success: false, error: "Erro interno do servidor" });
   }
 };
 export const getFeaturedProducts = async (
@@ -127,22 +139,24 @@ export const getFeaturedProducts = async (
   reply: FastifyReply
 ) => {
   try {
-    const { limit = '6' } = request.query;
+    const { limit = "6" } = request.query;
     const limitNum = parseInt(limit);
 
     const productRepo = AppDataSource.getRepository(Product);
 
     const products = await productRepo.find({
       where: { is_active: true, featured: true },
-      relations: ['category', 'images'],
-      order: { created_at: 'DESC' },
-      take: limitNum
+      relations: ["category", "images"],
+      order: { created_at: "DESC" },
+      take: limitNum,
     });
 
     reply.send({ success: true, data: products });
   } catch (error) {
-    console.error('Erro ao buscar produtos em destaque:', error);
-    reply.status(500).send({ success: false, error: 'Erro interno do servidor' });
+    console.error("Erro ao buscar produtos em destaque:", error);
+    reply
+      .status(500)
+      .send({ success: false, error: "Erro interno do servidor" });
   }
 };
 
@@ -184,14 +198,16 @@ export async function createProduct(
 
     return reply.status(201).send({ success: true, data: product });
   } catch (error) {
-    return reply.status(500).send({ success: false, error: (error as Error).message });
+    return reply
+      .status(500)
+      .send({ success: false, error: (error as Error).message });
   }
 }
 
 export async function updateProduct(
-  request: FastifyRequest<{ 
-    Params: { id: string }; 
-    Body: Partial<CreateProductBody> 
+  request: FastifyRequest<{
+    Params: { id: string };
+    Body: Partial<CreateProductBody>;
   }>,
   reply: FastifyReply
 ) {
@@ -201,13 +217,13 @@ export async function updateProduct(
 
     // Verificar se o produto existe
     const existingProduct = await productRepo.findOne({
-      where: { id: productId }
+      where: { id: productId },
     });
 
     if (!existingProduct) {
-      return reply.status(404).send({ 
-        success: false, 
-        error: "Product not found" 
+      return reply.status(404).send({
+        success: false,
+        error: "Product not found",
       });
     }
 
@@ -251,18 +267,17 @@ export async function updateProduct(
     // Buscar produto atualizado
     const updatedProduct = await productRepo.findOne({
       where: { id: productId },
-      relations: ['category'] // Incluir categoria se necessário
+      relations: ["category"], // Incluir categoria se necessário
     });
 
-    return reply.status(200).send({ 
-      success: true, 
-      data: updatedProduct 
+    return reply.status(200).send({
+      success: true,
+      data: updatedProduct,
     });
-
   } catch (error) {
-    return reply.status(500).send({ 
-      success: false, 
-      error: (error as Error).message 
+    return reply.status(500).send({
+      success: false,
+      error: (error as Error).message,
     });
   }
 }
@@ -276,34 +291,33 @@ export async function deleteProduct(
 
     // Verificar se o produto existe
     const product = await productRepo.findOne({
-      where: { id: request.params.id }
+      where: { id: request.params.id },
     });
 
     if (!product) {
-      return reply.status(404).send({ 
-        success: false, 
-        error: 'Produto não encontrado' 
+      return reply.status(404).send({
+        success: false,
+        error: "Produto não encontrado",
       });
     }
 
     // Marcar como inativo ao invés de excluir
-    await productRepo.update(request.params.id, { 
+    await productRepo.update(request.params.id, {
       is_active: false,
       // Opcional: adicionar campos de auditoria
       // deleted_at: new Date()
     });
 
-    return reply.status(200).send({ 
-      success: true, 
-      message: 'Produto desativado com sucesso',
-      data: { id: request.params.id }
+    return reply.status(200).send({
+      success: true,
+      message: "Produto desativado com sucesso",
+      data: { id: request.params.id },
     });
-
   } catch (error) {
-    console.error('Erro ao desativar produto:', error);
-    return reply.status(500).send({ 
-      success: false, 
-      error: (error as Error).message 
+    console.error("Erro ao desativar produto:", error);
+    return reply.status(500).send({
+      success: false,
+      error: (error as Error).message,
     });
   }
 }
