@@ -144,45 +144,6 @@ export const uploadToS3 = async (
   }
 };
 
-// Função para verificar saúde do S3
-const checkS3Health = async () => {
-  const startTime = Date.now();
-
-  try {
-    await s3Client.send(
-      new HeadBucketCommand({
-        Bucket: BUCKET_NAME,
-      })
-    );
-
-    return {
-      status: "healthy",
-      responseTime: Date.now() - startTime,
-      timestamp: new Date().toISOString(),
-    };
-  } catch (error: any) {
-    // Capturar detalhes completos do erro
-    const errorDetails = {
-      name: error.name || "UnknownError",
-      message: error.message || "Erro desconhecido",
-      code: error.code,
-      statusCode: error.$metadata?.httpStatusCode,
-      requestId: error.$metadata?.requestId,
-      // Não incluir stack em produção por segurança
-      ...(process.env.NODE_ENV === "development" && { stack: error.stack }),
-    };
-
-    console.error("Erro detalhado no S3 Health Check:", errorDetails);
-
-    return {
-      status: "unhealthy",
-      error: errorDetails,
-      responseTime: Date.now() - startTime,
-      timestamp: new Date().toISOString(),
-    };
-  }
-};
-
 /**
  * Upload de arquivo único
  */
@@ -240,86 +201,107 @@ export const uploadSingleFile = async (
   }
 };
 
-/**
- * Upload de múltiplos arquivos
- */
+// Upload múltiplo para S3 — controller
 export const uploadMultipleFiles = async (
   request: FastifyRequest,
   reply: FastifyReply
 ) => {
   try {
-    const parts = request.parts();
-    const fileArray: any[] = [];
-    let folder = "products";
+    // obter partes do multipart (pode ser AsyncIterable ou array)
+    const parts = (request as any).files ? (request as any).files() : null;
 
-    for await (const part of parts) {
-      if (part.type === "field" && part.fieldname === "folder") {
-        folder = part.value as string;
-      } else if (part.type === "file") {
-        fileArray.push(part);
-      }
-    }
-
-    if (fileArray.length === 0) {
+    if (!parts) {
       return reply.code(400).send({
         success: false,
         message: "Nenhum arquivo fornecido",
       });
     }
 
-    if (fileArray.length > 5) {
-      return reply.code(400).send({
-        success: false,
-        message: "Máximo de 5 arquivos permitidos",
-      });
-    }
+    const results: Array<any> = [];
+    const folder = "products"; // ajuste conforme necessário
 
-    const uploads = [];
-    const failed = [];
-
-    // Processar cada arquivo
-    for (const file of fileArray) {
+    // helper para processar um arquivo individual
+    const processFile = async (file: any) => {
       try {
-        // Validar arquivo
-        validateFile(file);
+        validateFile(file); // sua validação existente
 
-        // Ler buffer do arquivo
-        const fileBuffer = await file.toBuffer();
+        const buffer: Buffer = await file.toBuffer();
         const filename = generateUniqueFileName(file.filename, folder);
 
-        // Upload para S3
         const uploadResult = await uploadToS3(
-          fileBuffer,
+          buffer,
           filename,
           file.mimetype,
           file.filename
         );
 
-        uploads.push({
+        return {
           success: true,
           url: uploadResult.url,
           filename,
           originalName: file.filename,
-          size: fileBuffer.length,
-        });
-      } catch (error: any) {
-        failed.push({
-          file: file.filename,
-          error: error.message,
+          size: buffer.length,
+        };
+      } catch (err: any) {
+        // erro no arquivo individual — não quebra os outros uploads
+        return {
+          success: false,
+          originalName: file?.filename,
+          message: err?.message || String(err),
+        };
+      }
+    };
+
+    // Se parts for um AsyncIterable (fastify-multipart padrão)
+    if (typeof (parts as any)[Symbol.asyncIterator] === "function") {
+      for await (const file of parts as AsyncIterable<any>) {
+        // alguns clients podem enviar campos não-file — pular se não for file
+        if (!file || !file.filename) {
+          continue;
+        }
+        const r = await processFile(file);
+        results.push(r);
+      }
+    } else if (Array.isArray(parts)) {
+      // se for array (caso configurado assim)
+      for (const file of parts) {
+        if (!file || !file.filename) continue;
+        const r = await processFile(file);
+        results.push(r);
+      }
+    } else {
+      // fallback: tentar tratar como um único arquivo
+      const single = parts;
+      if (!single || !single.filename) {
+        return reply.code(400).send({
+          success: false,
+          message: "Nenhum arquivo válido encontrado no multipart",
         });
       }
+      results.push(await processFile(single));
+    }
+
+    if (results.length === 0) {
+      return reply.code(400).send({
+        success: false,
+        message: "Nenhum arquivo processado",
+      });
     }
 
     return reply.send({
-      success: failed.length === 0,
-      uploads,
-      ...(failed.length > 0 && { failed }),
+      success: true,
+      files: results,
     });
   } catch (error: any) {
-    console.error("Erro no upload múltiplo:", error);
+    console.error("Erro detalhado no upload múltiplo:", {
+      message: error?.message,
+      stack: error?.stack,
+      name: error?.name,
+    });
+
     return reply.code(500).send({
       success: false,
-      message: error.message || "Erro interno do servidor",
+      message: error?.message || "Erro interno do servidor",
     });
   }
 };
@@ -399,6 +381,44 @@ export const getFileInfo = async (
   }
 };
 
+// Função para verificar saúde do S3
+const checkS3Health = async () => {
+  const startTime = Date.now();
+
+  try {
+    await s3Client.send(
+      new HeadBucketCommand({
+        Bucket: BUCKET_NAME,
+      })
+    );
+
+    return {
+      status: "healthy",
+      responseTime: Date.now() - startTime,
+      timestamp: new Date().toISOString(),
+    };
+  } catch (error: any) {
+    // Capturar detalhes completos do erro
+    const errorDetails = {
+      name: error.name || "UnknownError",
+      message: error.message || "Erro desconhecido",
+      code: error.code,
+      statusCode: error.$metadata?.httpStatusCode,
+      requestId: error.$metadata?.requestId,
+      // Não incluir stack em produção por segurança
+      ...(process.env.NODE_ENV === "development" && { stack: error.stack }),
+    };
+
+    console.error("Erro detalhado no S3 Health Check:", errorDetails);
+
+    return {
+      status: "unhealthy",
+      error: errorDetails,
+      responseTime: Date.now() - startTime,
+      timestamp: new Date().toISOString(),
+    };
+  }
+};
 /**
  * Health check da conexão com AWS S3
  */
