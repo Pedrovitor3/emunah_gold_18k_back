@@ -12,16 +12,16 @@ interface CreateProductImageBody {
 }
 
 export const createProductImage = async (
-  request: FastifyRequest<{ Body: CreateProductImageBody }>,
+  request: FastifyRequest,
   reply: FastifyReply
 ) => {
   try {
     const imageRepo = AppDataSource.getRepository(ProductImage);
     const productRepo = AppDataSource.getRepository(Product);
-
+    const body = request.body as CreateProductImageBody;
     // Verificar se o produto existe
     const product = await productRepo.findOne({
-      where: { id: request.body.product_id },
+      where: { id: body.product_id },
     });
 
     if (!product) {
@@ -31,18 +31,18 @@ export const createProductImage = async (
     }
 
     // Se está marcando como principal, desmarcar outras imagens principais do mesmo produto
-    if (request.body.is_primary) {
+    if (body.is_primary) {
       await imageRepo.update(
-        { product_id: request.body.product_id, is_primary: true },
+        { product_id: body.product_id, is_primary: true },
         { is_primary: false }
       );
     }
 
     // Se não foi especificado sort_order, usar o próximo disponível
-    let sortOrder = request.body.sort_order ?? 0;
-    if (!request.body.sort_order) {
+    let sortOrder = body.sort_order ?? 0;
+    if (!body.sort_order) {
       const lastImage = await imageRepo.findOne({
-        where: { product_id: request.body.product_id },
+        where: { product_id: body.product_id },
         order: { sort_order: "DESC" },
       });
       sortOrder = (lastImage?.sort_order ?? 0) + 1;
@@ -50,11 +50,11 @@ export const createProductImage = async (
 
     // Criar instância da imagem
     const image = imageRepo.create({
-      product: { id: request.body.product_id },
-      product_id: request.body.product_id,
-      image_url: request.body.image_url,
-      alt_text: request.body.alt_text ?? "",
-      is_primary: request.body.is_primary ?? false,
+      product: { id: body.product_id },
+      product_id: body.product_id,
+      image_url: body.image_url,
+      alt_text: body.alt_text ?? "",
+      is_primary: body.is_primary ?? false,
       sort_order: sortOrder,
     });
 
@@ -77,14 +77,16 @@ export const createProductImage = async (
 };
 
 export const deleteProductImage = async (
-  request: FastifyRequest<{ Params: { id: string } }>,
+  request: FastifyRequest,
   reply: FastifyReply
 ) => {
   try {
+    const { id } = request.params as { id: string };
+
     const imageRepo = AppDataSource.getRepository(ProductImage);
 
     const image = await imageRepo.findOne({
-      where: { id: request.params.id },
+      where: { id: id },
     });
 
     if (!image) {
@@ -105,19 +107,17 @@ export const deleteProductImage = async (
 };
 
 export const updateImageOrder = async (
-  request: FastifyRequest<{
-    Params: { productId: string };
-    Body: { imageIds: string[] };
-  }>,
+  request: FastifyRequest,
   reply: FastifyReply
 ) => {
   try {
     const imageRepo = AppDataSource.getRepository(ProductImage);
     const productRepo = AppDataSource.getRepository(Product);
-
+    const { id } = request.params as { id: string };
+    const body = request.body as { imageIds: string[] };
     // Verificar se o produto existe
     const product = await productRepo.findOne({
-      where: { id: request.params.productId },
+      where: { id: id },
     });
 
     if (!product) {
@@ -127,18 +127,15 @@ export const updateImageOrder = async (
     }
 
     // Atualizar a ordem das imagens
-    const updatePromises = request.body.imageIds.map((imageId, index) =>
-      imageRepo.update(
-        { id: imageId, product_id: request.params.productId },
-        { sort_order: index }
-      )
+    const updatePromises = body.imageIds.map((imageId, index) =>
+      imageRepo.update({ id: imageId, product_id: id }, { sort_order: index })
     );
 
     await Promise.all(updatePromises);
 
     // Buscar imagens atualizadas
     const updatedImages = await imageRepo.find({
-      where: { product_id: request.params.productId },
+      where: { product_id: id },
       relations: ["product"],
       order: { sort_order: "ASC" },
     });

@@ -174,24 +174,25 @@ interface CreateProductBody {
 }
 
 export async function createProduct(
-  request: FastifyRequest<{ Body: CreateProductBody }>,
+  request: FastifyRequest,
   reply: FastifyReply
 ) {
+  const body = request.body as CreateProductBody;
   try {
     const productRepo = AppDataSource.getRepository(Product);
 
     // Criar instância do produto
     const product = productRepo.create({
-      category: { id: request.body.category_id },
-      name: request.body.name,
-      description: request.body.description ?? "",
-      sku: request.body.sku,
-      price: request.body.price,
-      weight: request.body.weight ?? 0,
-      gold_purity: request.body.gold_purity ?? "",
-      stock_quantity: request.body.stock_quantity ?? 0,
-      is_active: request.body.is_active ?? true,
-      featured: request.body.featured ?? false,
+      category: { id: body.category_id },
+      name: body.name,
+      description: body.description ?? "",
+      sku: body.sku,
+      price: body.price,
+      weight: body.weight ?? 0,
+      gold_purity: body.gold_purity ?? "",
+      stock_quantity: body.stock_quantity ?? 0,
+      is_active: body.is_active ?? true,
+      featured: body.featured ?? false,
     });
 
     await productRepo.save(product);
@@ -205,19 +206,16 @@ export async function createProduct(
 }
 
 export async function updateProduct(
-  request: FastifyRequest<{
-    Params: { id: string };
-    Body: Partial<CreateProductBody>;
-  }>,
+  request: FastifyRequest,
   reply: FastifyReply
 ) {
   try {
+    const { id } = request.params as { id: string };
+    const body = request.body as CreateProductBody;
     const productRepo = AppDataSource.getRepository(Product);
-    const productId = request.params.id;
-
     // Verificar se o produto existe
     const existingProduct = await productRepo.findOne({
-      where: { id: productId },
+      where: { id: id },
     });
 
     if (!existingProduct) {
@@ -230,43 +228,43 @@ export async function updateProduct(
     // Preparar dados para atualização
     const updateData: any = {};
 
-    if (request.body.category_id !== undefined) {
-      updateData.category = { id: request.body.category_id };
+    if (body.category_id !== undefined) {
+      updateData.category = { id: body.category_id };
     }
-    if (request.body.name !== undefined) {
-      updateData.name = request.body.name;
+    if (body.name !== undefined) {
+      updateData.name = body.name;
     }
-    if (request.body.description !== undefined) {
-      updateData.description = request.body.description;
+    if (body.description !== undefined) {
+      updateData.description = body.description;
     }
-    if (request.body.sku !== undefined) {
-      updateData.sku = request.body.sku;
+    if (body.sku !== undefined) {
+      updateData.sku = body.sku;
     }
-    if (request.body.price !== undefined) {
-      updateData.price = request.body.price;
+    if (body.price !== undefined) {
+      updateData.price = body.price;
     }
-    if (request.body.weight !== undefined) {
-      updateData.weight = request.body.weight;
+    if (body.weight !== undefined) {
+      updateData.weight = body.weight;
     }
-    if (request.body.gold_purity !== undefined) {
-      updateData.gold_purity = request.body.gold_purity;
+    if (body.gold_purity !== undefined) {
+      updateData.gold_purity = body.gold_purity;
     }
-    if (request.body.stock_quantity !== undefined) {
-      updateData.stock_quantity = request.body.stock_quantity;
+    if (body.stock_quantity !== undefined) {
+      updateData.stock_quantity = body.stock_quantity;
     }
-    if (request.body.is_active !== undefined) {
-      updateData.is_active = request.body.is_active;
+    if (body.is_active !== undefined) {
+      updateData.is_active = body.is_active;
     }
-    if (request.body.featured !== undefined) {
-      updateData.featured = request.body.featured;
+    if (body.featured !== undefined) {
+      updateData.featured = body.featured;
     }
 
     // Atualizar produto
-    await productRepo.update(productId, updateData);
+    await productRepo.update(id, updateData);
 
     // Buscar produto atualizado
     const updatedProduct = await productRepo.findOne({
-      where: { id: productId },
+      where: { id: id },
       relations: ["category"], // Incluir categoria se necessário
     });
 
@@ -283,15 +281,16 @@ export async function updateProduct(
 }
 
 export async function deleteProduct(
-  request: FastifyRequest<{ Params: DeleteProductParams }>,
+  request: FastifyRequest,
   reply: FastifyReply
 ) {
+  const { id } = request.params as { id: string };
   try {
     const productRepo = AppDataSource.getRepository(Product);
 
     // Verificar se o produto existe
     const product = await productRepo.findOne({
-      where: { id: request.params.id },
+      where: { id: id },
     });
 
     if (!product) {
@@ -302,7 +301,7 @@ export async function deleteProduct(
     }
 
     // Marcar como inativo ao invés de excluir
-    await productRepo.update(request.params.id, {
+    await productRepo.update(id, {
       is_active: false,
       // Opcional: adicionar campos de auditoria
       // deleted_at: new Date()
@@ -311,7 +310,7 @@ export async function deleteProduct(
     return reply.status(200).send({
       success: true,
       message: "Produto desativado com sucesso",
-      data: { id: request.params.id },
+      data: { id: id },
     });
   } catch (error) {
     console.error("Erro ao desativar produto:", error);

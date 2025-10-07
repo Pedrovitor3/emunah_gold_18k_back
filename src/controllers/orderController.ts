@@ -3,15 +3,18 @@
  * Emunah Gold 18K - Backend
  */
 
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { AppDataSource } from '../config/database';
-import { Repository } from 'typeorm';
-import { Order, OrderStatus, PaymentMethod, PaymentStatus } from '../models/Order';
-import { OrderItem } from '../models/OrderItem';
-import { Product } from '../models/Product';
-import { CartItem } from '../models/CartItem';
-import { Payment } from '../models/Payment';
-import { User } from '../models/User';
+import { FastifyRequest, FastifyReply } from "fastify";
+import { AppDataSource } from "../config/database";
+import {
+  Order,
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+} from "../models/Order";
+import { OrderItem } from "../models/OrderItem";
+import { Product } from "../models/Product";
+import { CartItem } from "../models/CartItem";
+import { Payment } from "../models/Payment";
 
 /**
  * Interface para criar pedido
@@ -52,7 +55,9 @@ interface ApiResponse<T> {
  */
 const generateOrderNumber = (): string => {
   const timestamp = Date.now().toString();
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  const random = Math.floor(Math.random() * 1000)
+    .toString()
+    .padStart(3, "0");
   return `EMU${timestamp.slice(-6)}${random}`;
 };
 
@@ -60,10 +65,14 @@ const generateOrderNumber = (): string => {
  * Simula geração de código PIX
  */
 const generatePixCode = (amount: number): { qrCode: string; code: string } => {
-  const pixCode = `00020126580014br.gov.bcb.pix0136${Math.random().toString(36).substring(2, 15)}520400005303986540${amount.toFixed(2)}5802BR5913Emunah Gold 18K6009Sao Paulo62070503***6304`;
+  const pixCode = `00020126580014br.gov.bcb.pix0136${Math.random()
+    .toString(36)
+    .substring(2, 15)}520400005303986540${amount.toFixed(
+    2
+  )}5802BR5913Emunah Gold 18K6009Sao Paulo62070503***6304`;
   return {
     qrCode: `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==`, // Placeholder
-    code: pixCode
+    code: pixCode,
   };
 };
 
@@ -75,7 +84,7 @@ export const createOrder = async (
   reply: FastifyReply
 ): Promise<void> => {
   const queryRunner = AppDataSource.createQueryRunner();
-  
+
   try {
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -86,7 +95,7 @@ export const createOrder = async (
     if (!userId) {
       return reply.status(401).send({
         success: false,
-        error: 'Usuário não autenticado'
+        error: "Usuário não autenticado",
       });
     }
 
@@ -100,14 +109,14 @@ export const createOrder = async (
     // Buscar itens do carrinho
     const cartItems = await cartItemRepository.find({
       where: { user_id: userId },
-      relations: ['product']
+      relations: ["product"],
     });
 
     if (cartItems.length === 0) {
       await queryRunner.rollbackTransaction();
       return reply.status(400).send({
         success: false,
-        error: 'Carrinho vazio'
+        error: "Carrinho vazio",
       });
     }
 
@@ -118,7 +127,7 @@ export const createOrder = async (
         await queryRunner.rollbackTransaction();
         return reply.status(400).send({
           success: false,
-          error: `Produto ${item.product.name} não está ativo`
+          error: `Produto ${item.product.name} não está ativo`,
         });
       }
 
@@ -126,10 +135,10 @@ export const createOrder = async (
         await queryRunner.rollbackTransaction();
         return reply.status(400).send({
           success: false,
-          error: `Produto ${item.product.name} não tem estoque suficiente`
+          error: `Produto ${item.product.name} não tem estoque suficiente`,
         });
       }
-      
+
       subtotal += Number(item.product.price) * item.quantity;
     }
 
@@ -138,7 +147,7 @@ export const createOrder = async (
 
     // Criar pedido
     const orderNumber = generateOrderNumber();
-    
+
     // Preparar dados do pedido
     const orderData: Partial<Order> = {
       user_id: userId,
@@ -149,7 +158,7 @@ export const createOrder = async (
       subtotal,
       shipping_cost: shippingCost,
       total,
-      shipping_address
+      shipping_address,
     };
 
     // Adicionar notes apenas se existir
@@ -158,18 +167,18 @@ export const createOrder = async (
     }
 
     const newOrder = orderRepository.create(orderData);
-    const savedOrder = await queryRunner.manager.save(newOrder) as Order;
+    const savedOrder = (await queryRunner.manager.save(newOrder)) as Order;
 
     // Criar itens do pedido
     for (const item of cartItems) {
       const itemTotal = Number(item.product.price) * item.quantity;
-      
+
       const orderItem = orderItemRepository.create({
         order_id: savedOrder.id,
         product_id: item.product.id,
         quantity: item.quantity,
         unit_price: Number(item.product.price),
-        total_price: itemTotal
+        total_price: itemTotal,
       });
 
       await queryRunner.manager.save(orderItem);
@@ -185,16 +194,17 @@ export const createOrder = async (
       pixData = generatePixCode(total);
     }
 
-    const expiresAt = payment_method === PaymentMethod.PIX 
-      ? new Date(Date.now() + 30 * 60 * 1000) // 30 minutos para PIX
-      : null;
+    const expiresAt =
+      payment_method === PaymentMethod.PIX
+        ? new Date(Date.now() + 30 * 60 * 1000) // 30 minutos para PIX
+        : null;
 
     // Preparar dados do pagamento
     const paymentData: Partial<Payment> = {
       order_id: savedOrder.id,
       payment_method,
       amount: total,
-      status: PaymentStatus.PENDING
+      status: PaymentStatus.PENDING,
     };
 
     // Adicionar dados PIX apenas se existirem
@@ -215,9 +225,9 @@ export const createOrder = async (
 
     await queryRunner.commitTransaction();
 
-    const response: ApiResponse<{ 
-      orderId: string; 
-      orderNumber: string; 
+    const response: ApiResponse<{
+      orderId: string;
+      orderNumber: string;
       total: number;
       pixData?: typeof pixData;
     }> = {
@@ -226,18 +236,18 @@ export const createOrder = async (
         orderId: savedOrder.id,
         orderNumber,
         total,
-        ...(pixData && { pixData })
+        ...(pixData && { pixData }),
       },
-      message: 'Pedido criado com sucesso'
+      message: "Pedido criado com sucesso",
     };
 
     reply.status(201).send(response);
   } catch (error) {
     await queryRunner.rollbackTransaction();
-    console.error('Erro ao criar pedido:', error);
+    console.error("Erro ao criar pedido:", error);
     reply.status(500).send({
       success: false,
-      error: 'Erro interno do servidor'
+      error: "Erro interno do servidor",
     });
   } finally {
     await queryRunner.release();
@@ -257,7 +267,7 @@ export const getUserOrders = async (
     if (!userId) {
       return reply.status(401).send({
         success: false,
-        error: 'Usuário não autenticado'
+        error: "Usuário não autenticado",
       });
     }
 
@@ -265,11 +275,11 @@ export const getUserOrders = async (
 
     const orders = await orderRepository.find({
       where: { user_id: userId },
-      relations: ['items', 'items.product'],
-      order: { created_at: 'DESC' }
+      relations: ["items", "items.product"],
+      order: { created_at: "DESC" },
     });
 
-    const formattedOrders = orders.map(order => ({
+    const formattedOrders = orders.map((order) => ({
       id: order.id,
       user_id: order.user_id,
       order_number: order.order_number,
@@ -284,28 +294,28 @@ export const getUserOrders = async (
       notes: order.notes,
       created_at: order.created_at,
       updated_at: order.updated_at,
-      items: order.items.map(item => ({
+      items: order.items.map((item) => ({
         id: item.id,
         product_id: item.product_id,
         quantity: item.quantity,
         unit_price: Number(item.unit_price),
         total_price: Number(item.total_price),
         product_name: item.product?.name,
-        product_sku: item.product?.sku
-      }))
+        product_sku: item.product?.sku,
+      })),
     }));
 
     const response: ApiResponse<typeof formattedOrders> = {
       success: true,
-      data: formattedOrders
+      data: formattedOrders,
     };
 
     reply.send(response);
   } catch (error) {
-    console.error('Erro ao buscar pedidos:', error);
+    console.error("Erro ao buscar pedidos:", error);
     reply.status(500).send({
       success: false,
-      error: 'Erro interno do servidor'
+      error: "Erro interno do servidor",
     });
   }
 };
@@ -324,7 +334,7 @@ export const getOrderById = async (
     if (!userId) {
       return reply.status(401).send({
         success: false,
-        error: 'Usuário não autenticado'
+        error: "Usuário não autenticado",
       });
     }
 
@@ -332,13 +342,13 @@ export const getOrderById = async (
 
     const order = await orderRepository.findOne({
       where: { id, user_id: userId },
-      relations: ['items', 'items.product', 'payments']
+      relations: ["items", "items.product", "payments"],
     });
 
     if (!order) {
       return reply.status(404).send({
         success: false,
-        error: 'Pedido não encontrado'
+        error: "Pedido não encontrado",
       });
     }
 
@@ -357,16 +367,16 @@ export const getOrderById = async (
       notes: order.notes,
       created_at: order.created_at,
       updated_at: order.updated_at,
-      items: order.items.map(item => ({
+      items: order.items.map((item) => ({
         id: item.id,
         product_id: item.product_id,
         quantity: item.quantity,
         unit_price: Number(item.unit_price),
         total_price: Number(item.total_price),
         product_name: item.product?.name,
-        product_sku: item.product?.sku
+        product_sku: item.product?.sku,
       })),
-      payments: order.payments.map(payment => ({
+      payments: order.payments.map((payment) => ({
         id: payment.id,
         payment_method: payment.payment_method,
         amount: Number(payment.amount),
@@ -374,21 +384,21 @@ export const getOrderById = async (
         pix_qr_code: payment.pix_qr_code,
         pix_code: payment.pix_code,
         expires_at: payment.expires_at,
-        paid_at: payment.paid_at
-      }))
+        paid_at: payment.paid_at,
+      })),
     };
 
     const response: ApiResponse<typeof formattedOrder> = {
       success: true,
-      data: formattedOrder
+      data: formattedOrder,
     };
 
     reply.send(response);
   } catch (error) {
-    console.error('Erro ao buscar pedido:', error);
+    console.error("Erro ao buscar pedido:", error);
     reply.status(500).send({
       success: false,
-      error: 'Erro interno do servidor'
+      error: "Erro interno do servidor",
     });
   }
 };
@@ -401,7 +411,7 @@ export const confirmPayment = async (
   reply: FastifyReply
 ): Promise<void> => {
   const queryRunner = AppDataSource.createQueryRunner();
-  
+
   try {
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -417,22 +427,25 @@ export const confirmPayment = async (
       await queryRunner.rollbackTransaction();
       return reply.status(404).send({
         success: false,
-        error: 'Pedido não encontrado'
+        error: "Pedido não encontrado",
       });
     }
 
     // Atualizar status do pagamento
     await paymentRepository.update(
       { order_id: id },
-      { 
-        status: PaymentStatus.PAID, 
-        paid_at: new Date() 
+      {
+        status: PaymentStatus.PAID,
+        paid_at: new Date(),
       }
     );
 
     // Gerar código de rastreamento simulado
-    const trackingCode = `BR${Math.random().toString(36).substring(2, 15).toUpperCase()}`;
-    
+    const trackingCode = `BR${Math.random()
+      .toString(36)
+      .substring(2, 15)
+      .toUpperCase()}`;
+
     // Atualizar status do pedido
     await orderRepository.update(
       { id },
@@ -440,7 +453,7 @@ export const confirmPayment = async (
         status: OrderStatus.PAID,
         payment_status: PaymentStatus.PAID,
         tracking_code: trackingCode,
-        updated_at: new Date()
+        updated_at: new Date(),
       }
     );
 
@@ -449,16 +462,16 @@ export const confirmPayment = async (
     const response: ApiResponse<{ trackingCode: string }> = {
       success: true,
       data: { trackingCode },
-      message: 'Pagamento confirmado com sucesso'
+      message: "Pagamento confirmado com sucesso",
     };
 
     reply.send(response);
   } catch (error) {
     await queryRunner.rollbackTransaction();
-    console.error('Erro ao confirmar pagamento:', error);
+    console.error("Erro ao confirmar pagamento:", error);
     reply.status(500).send({
       success: false,
-      error: 'Erro interno do servidor'
+      error: "Erro interno do servidor",
     });
   } finally {
     await queryRunner.release();

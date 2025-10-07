@@ -3,11 +3,10 @@
  * Emunah Gold 18K - Backend
  */
 
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { AppDataSource } from '../config/database';
-import { CartItem } from '../models/CartItem';
-import { Product } from '../models/Product';
-import { User } from '../models/User';
+import { FastifyRequest, FastifyReply } from "fastify";
+import { AppDataSource } from "../config/database";
+import { CartItem } from "../models/CartItem";
+import { Product } from "../models/Product";
 
 /**
  * Interface para adicionar item ao carrinho
@@ -54,7 +53,7 @@ export const getCartItems = async (
     if (!userId) {
       return reply.status(401).send({
         success: false,
-        error: 'Usuário não autenticado'
+        error: "Usuário não autenticado",
       });
     }
 
@@ -62,14 +61,14 @@ export const getCartItems = async (
 
     const cartItems = await cartItemRepository.find({
       where: { user_id: userId },
-      relations: ['product', 'product.images'],
-      order: { created_at: 'DESC' }
+      relations: ["product", "product.images"],
+      order: { created_at: "DESC" },
     });
 
     // Filtrar apenas produtos ativos
-    const activeCartItems = cartItems.filter(item => item.product.is_active);
+    const activeCartItems = cartItems.filter((item) => item.product.is_active);
 
-    const formattedCartItems = activeCartItems.map(item => ({
+    const formattedCartItems = activeCartItems.map((item) => ({
       id: item.id,
       user_id: item.user_id,
       product_id: item.product_id,
@@ -85,21 +84,21 @@ export const getCartItems = async (
         weight: item.product.weight ? Number(item.product.weight) : null,
         gold_purity: item.product.gold_purity,
         stock_quantity: item.product.stock_quantity,
-        images: item.product.images || []
-      }
+        images: item.product.images || [],
+      },
     }));
 
     const response: ApiResponse<typeof formattedCartItems> = {
       success: true,
-      data: formattedCartItems
+      data: formattedCartItems,
     };
 
     reply.send(response);
   } catch (error) {
-    console.error('Erro ao buscar carrinho:', error);
+    console.error("Erro ao buscar carrinho:", error);
     reply.status(500).send({
       success: false,
-      error: 'Erro interno do servidor'
+      error: "Erro interno do servidor",
     });
   }
 };
@@ -112,7 +111,7 @@ export const addToCart = async (
   reply: FastifyReply
 ): Promise<void> => {
   const queryRunner = AppDataSource.createQueryRunner();
-  
+
   try {
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -123,14 +122,14 @@ export const addToCart = async (
     if (!userId) {
       return reply.status(401).send({
         success: false,
-        error: 'Usuário não autenticado'
+        error: "Usuário não autenticado",
       });
     }
 
     if (!product_id || !quantity || quantity <= 0) {
       return reply.status(400).send({
         success: false,
-        error: 'Produto e quantidade são obrigatórios'
+        error: "Produto e quantidade são obrigatórios",
       });
     }
 
@@ -139,14 +138,14 @@ export const addToCart = async (
 
     // Verificar se o produto existe e está ativo
     const product = await productRepository.findOne({
-      where: { id: product_id, is_active: true }
+      where: { id: product_id, is_active: true },
     });
 
     if (!product) {
       await queryRunner.rollbackTransaction();
       return reply.status(404).send({
         success: false,
-        error: 'Produto não encontrado'
+        error: "Produto não encontrado",
       });
     }
 
@@ -154,24 +153,24 @@ export const addToCart = async (
       await queryRunner.rollbackTransaction();
       return reply.status(400).send({
         success: false,
-        error: 'Quantidade solicitada não disponível em estoque'
+        error: "Quantidade solicitada não disponível em estoque",
       });
     }
 
     // Verificar se o item já existe no carrinho
     const existingItem = await cartItemRepository.findOne({
-      where: { user_id: userId, product_id }
+      where: { user_id: userId, product_id },
     });
 
     if (existingItem) {
       // Atualizar quantidade do item existente
       const newQuantity = existingItem.quantity + quantity;
-      
+
       if (product.stock_quantity < newQuantity) {
         await queryRunner.rollbackTransaction();
         return reply.status(400).send({
           success: false,
-          error: 'Quantidade total solicitada não disponível em estoque'
+          error: "Quantidade total solicitada não disponível em estoque",
         });
       }
 
@@ -183,7 +182,7 @@ export const addToCart = async (
       const cartItemData: Partial<CartItem> = {
         user_id: userId,
         product_id,
-        quantity
+        quantity,
       };
 
       const newCartItem = cartItemRepository.create(cartItemData);
@@ -194,16 +193,16 @@ export const addToCart = async (
 
     const response: ApiResponse = {
       success: true,
-      message: 'Item adicionado ao carrinho com sucesso'
+      message: "Item adicionado ao carrinho com sucesso",
     };
 
     reply.send(response);
   } catch (error) {
     await queryRunner.rollbackTransaction();
-    console.error('Erro ao adicionar ao carrinho:', error);
+    console.error("Erro ao adicionar ao carrinho:", error);
     reply.status(500).send({
       success: false,
-      error: 'Erro interno do servidor'
+      error: "Erro interno do servidor",
     });
   } finally {
     await queryRunner.release();
@@ -218,7 +217,7 @@ export const updateCartItem = async (
   reply: FastifyReply
 ): Promise<void> => {
   const queryRunner = AppDataSource.createQueryRunner();
-  
+
   try {
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -230,14 +229,14 @@ export const updateCartItem = async (
     if (!userId) {
       return reply.status(401).send({
         success: false,
-        error: 'Usuário não autenticado'
+        error: "Usuário não autenticado",
       });
     }
 
     if (!quantity || quantity <= 0) {
       return reply.status(400).send({
         success: false,
-        error: 'Quantidade deve ser maior que zero'
+        error: "Quantidade deve ser maior que zero",
       });
     }
 
@@ -246,27 +245,27 @@ export const updateCartItem = async (
 
     // Verificar se o item existe no carrinho do usuário
     const cartItem = await cartItemRepository.findOne({
-      where: { user_id: userId, product_id: productId }
+      where: { user_id: userId, product_id: productId },
     });
 
     if (!cartItem) {
       await queryRunner.rollbackTransaction();
       return reply.status(404).send({
         success: false,
-        error: 'Item não encontrado no carrinho'
+        error: "Item não encontrado no carrinho",
       });
     }
 
     // Verificar estoque disponível
     const product = await productRepository.findOne({
-      where: { id: productId, is_active: true }
+      where: { id: productId, is_active: true },
     });
 
     if (!product) {
       await queryRunner.rollbackTransaction();
       return reply.status(404).send({
         success: false,
-        error: 'Produto não encontrado'
+        error: "Produto não encontrado",
       });
     }
 
@@ -274,7 +273,7 @@ export const updateCartItem = async (
       await queryRunner.rollbackTransaction();
       return reply.status(400).send({
         success: false,
-        error: 'Quantidade solicitada não disponível em estoque'
+        error: "Quantidade solicitada não disponível em estoque",
       });
     }
 
@@ -287,16 +286,16 @@ export const updateCartItem = async (
 
     const response: ApiResponse = {
       success: true,
-      message: 'Quantidade atualizada com sucesso'
+      message: "Quantidade atualizada com sucesso",
     };
 
     reply.send(response);
   } catch (error) {
     await queryRunner.rollbackTransaction();
-    console.error('Erro ao atualizar carrinho:', error);
+    console.error("Erro ao atualizar carrinho:", error);
     reply.status(500).send({
       success: false,
-      error: 'Erro interno do servidor'
+      error: "Erro interno do servidor",
     });
   } finally {
     await queryRunner.release();
@@ -317,7 +316,7 @@ export const removeFromCart = async (
     if (!userId) {
       return reply.status(401).send({
         success: false,
-        error: 'Usuário não autenticado'
+        error: "Usuário não autenticado",
       });
     }
 
@@ -326,27 +325,27 @@ export const removeFromCart = async (
     // Remover item do carrinho
     const result = await cartItemRepository.delete({
       user_id: userId,
-      product_id: productId
+      product_id: productId,
     });
 
     if (result.affected === 0) {
       return reply.status(404).send({
         success: false,
-        error: 'Item não encontrado no carrinho'
+        error: "Item não encontrado no carrinho",
       });
     }
 
     const response: ApiResponse = {
       success: true,
-      message: 'Item removido do carrinho com sucesso'
+      message: "Item removido do carrinho com sucesso",
     };
 
     reply.send(response);
   } catch (error) {
-    console.error('Erro ao remover do carrinho:', error);
+    console.error("Erro ao remover do carrinho:", error);
     reply.status(500).send({
       success: false,
-      error: 'Erro interno do servidor'
+      error: "Erro interno do servidor",
     });
   }
 };
@@ -364,7 +363,7 @@ export const clearCart = async (
     if (!userId) {
       return reply.status(401).send({
         success: false,
-        error: 'Usuário não autenticado'
+        error: "Usuário não autenticado",
       });
     }
 
@@ -374,15 +373,15 @@ export const clearCart = async (
 
     const response: ApiResponse = {
       success: true,
-      message: 'Carrinho limpo com sucesso'
+      message: "Carrinho limpo com sucesso",
     };
 
     reply.send(response);
   } catch (error) {
-    console.error('Erro ao limpar carrinho:', error);
+    console.error("Erro ao limpar carrinho:", error);
     reply.status(500).send({
       success: false,
-      error: 'Erro interno do servidor'
+      error: "Erro interno do servidor",
     });
   }
 };
