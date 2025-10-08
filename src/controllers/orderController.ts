@@ -22,13 +22,14 @@ import { Payment } from "../models/Payment";
 interface CreateOrderData {
   payment_method: PaymentMethod;
   shipping_address: {
-    street: string;
-    number: string;
-    complement?: string;
-    neighborhood: string;
-    city: string;
-    state: string;
-    zip_code: string;
+    cep: string;
+    logradouro: string;
+    complemento: string;
+    bairro: string;
+    estado: string;
+    localidade: string;
+    uf: string;
+    ddd: string;
   };
   notes?: string;
 }
