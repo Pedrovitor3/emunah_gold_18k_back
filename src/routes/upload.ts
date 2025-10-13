@@ -1,7 +1,7 @@
 import { FastifyInstance } from "fastify";
 import {
-  uploadSingleFile,
-  uploadMultipleFiles,
+  // uploadSingleFile,
+  // uploadMultipleFiles,
   deleteFile,
   getFileInfo,
   healthCheck,
@@ -15,11 +15,11 @@ export default async function uploadRoutes(fastify: FastifyInstance) {
   // Health check da conexão S3
   fastify.get("/health", healthCheck);
 
-  // Upload de arquivo único
-  fastify.post("/single", uploadSingleFile);
+  // // Upload de arquivo único
+  // fastify.post("/single", uploadSingleFile);
 
-  // Upload de múltiplos arquivos
-  fastify.post("/multiple", uploadMultipleFiles);
+  // // Upload de múltiplos arquivos
+  // fastify.post("/multiple", uploadMultipleFiles);
 
   // Deletar arquivo
   fastify.delete("/:filename", deleteFile);

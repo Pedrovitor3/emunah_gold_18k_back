@@ -123,7 +123,6 @@ export const getCategoryBySlug = async (
     const categoryRepo = AppDataSource.getRepository(Category);
 
     const category = await categoryRepo.findOne({
-      where: { slug: request.params.slug, is_active: true },
       relations: ["products"],
       loadRelationIds: false,
     });
@@ -196,22 +195,9 @@ export const createCategory = async (
 
     const categoryRepo = AppDataSource.getRepository(Category);
 
-    // Verificar se já existe categoria com o mesmo slug
-    const existingCategory = await categoryRepo.findOne({
-      where: { slug: body.slug },
-    });
-
-    if (existingCategory) {
-      return reply.status(409).send({
-        success: false,
-        error: "Já existe uma categoria com este slug",
-      });
-    }
-
     // Criar instância da categoria
     const category = categoryRepo.create({
       name: body.name,
-      slug: body.slug,
       description: body.description ?? "",
       is_active: body.is_active ?? true,
     });
@@ -252,20 +238,6 @@ export const updateCategory = async (
       return reply
         .status(404)
         .send({ success: false, error: "Categoria não encontrada" });
-    }
-
-    // Verificar se o slug já existe (apenas se está sendo alterado)
-    if (body.slug && body.slug !== category.slug) {
-      const existingCategory = await categoryRepo.findOne({
-        where: { slug: body.slug },
-      });
-
-      if (existingCategory) {
-        return reply.status(409).send({
-          success: false,
-          error: "Já existe uma categoria com este slug",
-        });
-      }
     }
 
     // Atualizar campos

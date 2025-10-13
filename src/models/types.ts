@@ -76,7 +76,6 @@ export interface Product {
   category_id: string;
   name: string;
   description?: string;
-  sku: string;
   price: number;
   weight?: number | null;
   gold_purity?: string;
@@ -200,24 +199,24 @@ export interface OrderTracking {
  * Enums para status e tipos
  */
 export enum OrderStatus {
-  PENDING = 'pending',
-  PAID = 'paid',
-  PROCESSING = 'processing',
-  SHIPPED = 'shipped',
-  DELIVERED = 'delivered',
-  CANCELLED = 'cancelled'
+  PENDING = "pending",
+  PAID = "paid",
+  PROCESSING = "processing",
+  SHIPPED = "shipped",
+  DELIVERED = "delivered",
+  CANCELLED = "cancelled",
 }
 
 export enum PaymentMethod {
-  CREDIT_CARD = 'credit_card',
-  PIX = 'pix'
+  CREDIT_CARD = "credit_card",
+  PIX = "pix",
 }
 
 export enum PaymentStatus {
-  PENDING = 'pending',
-  PAID = 'paid',
-  FAILED = 'failed',
-  REFUNDED = 'refunded'
+  PENDING = "pending",
+  PAID = "paid",
+  FAILED = "failed",
+  REFUNDED = "refunded",
 }
 
 /**
@@ -257,4 +256,3 @@ export interface JwtPayload {
   iat?: number;
   exp?: number;
 }
-

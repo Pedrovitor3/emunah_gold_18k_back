@@ -61,7 +61,7 @@ export const getCartItems = async (
 
     const cartItems = await cartItemRepository.find({
       where: { user_id: userId },
-      relations: ["product", "product.images"],
+      relations: ["product"],
       order: { created_at: "DESC" },
     });
 
@@ -80,11 +80,10 @@ export const getCartItems = async (
         name: item.product.name,
         description: item.product.description,
         price: Number(item.product.price),
-        sku: item.product.sku,
         weight: item.product.weight ? Number(item.product.weight) : null,
         gold_purity: item.product.gold_purity,
         stock_quantity: item.product.stock_quantity,
-        images: item.product.images || [],
+        image_urls: item.product.image_urls || [],
       },
     }));
 

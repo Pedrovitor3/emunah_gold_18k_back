@@ -1,14 +1,22 @@
 // src/models/Product.ts
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
-import { Category } from '../Category';
-import { ProductImage } from '../ProductImage';
-import { CartItem } from '../CartItem';
-import { OrderItem } from '../OrderItem';
-import type { User } from '../User';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  OneToMany,
+  JoinColumn,
+} from "typeorm";
+import { Category } from "../Category";
+import { CartItem } from "../CartItem";
+import { OrderItem } from "../OrderItem";
+import type { User } from "../User";
 
-@Entity('products')
+@Entity("products")
 export class Product {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column()
@@ -20,13 +28,10 @@ export class Product {
   @Column({ nullable: true })
   description?: string;
 
-  @Column({ unique: true })
-  sku: string;
-
-  @Column('decimal', { precision: 10, scale: 2 })
+  @Column("decimal", { precision: 10, scale: 2 })
   price: number;
 
-  @Column('decimal', { precision: 8, scale: 3, nullable: true })
+  @Column("decimal", { precision: 8, scale: 3, nullable: true })
   weight?: number;
 
   @Column({ nullable: true })
@@ -41,26 +46,24 @@ export class Product {
   @Column({ default: false })
   featured: boolean;
 
+  // Array de URLs das imagens
+  @Column("simple-array", { nullable: true })
+  image_urls?: string[];
+
   @CreateDateColumn()
   created_at: Date;
 
   @UpdateDateColumn()
   updated_at: Date;
 
-  // @UpdateDateColumn()
-  // deleted_at: Date;
-
   // Relacionamentos
-  @ManyToOne(() => Category, category => category.products)
-  @JoinColumn({ name: 'category_id' })
+  @ManyToOne(() => Category, (category) => category.products)
+  @JoinColumn({ name: "category_id" })
   category: Category;
 
-  @OneToMany(() => ProductImage, image => image.product)
-  images: ProductImage[];
-
-  @OneToMany(() => CartItem, cartItem => cartItem.product)
+  @OneToMany(() => CartItem, (cartItem) => cartItem.product)
   cart_items: CartItem[];
 
-  @OneToMany(() => OrderItem, orderItem => orderItem.product)
+  @OneToMany(() => OrderItem, (orderItem) => orderItem.product)
   order_items: OrderItem[];
 }

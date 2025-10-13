@@ -3,6 +3,7 @@ import { FastifyRequest, FastifyReply } from "fastify";
 import { AppDataSource } from "../config/database";
 import { User } from "../models/User";
 import bcrypt from "bcryptjs";
+import { Address } from "../models/Address";
 
 interface CreateUserBody {
   email: string;
@@ -98,33 +99,69 @@ export const createUser = async (
 };
 
 export const updateUser = async (
-  request: FastifyRequest<{ Params: { id: string }; Body: UpdateUserBody }>,
+  request: FastifyRequest<{
+    Params: { id: string };
+    Body: UpdateUserBody & { address?: any };
+  }>,
   reply: FastifyReply
 ) => {
   try {
     const { id } = request.params;
-    const body = request.body;
-    const userRepo = AppDataSource.getRepository(User);
+    const { address, ...body } = request.body;
 
-    const user = await userRepo.findOne({ where: { id } });
-    if (!user)
+    const userRepo = AppDataSource.getRepository(User);
+    const addressRepo = AppDataSource.getRepository(Address);
+
+    const user = await userRepo.findOne({
+      where: { id },
+      relations: ["addresses"],
+    });
+
+    if (!user) {
       return reply
         .status(404)
         .send({ success: false, error: "Usuário não encontrado" });
+    }
 
-    const updateData: UpdateUserBody = {
+    // Atualiza dados básicos do usuário
+    await userRepo.update(id, {
       first_name: body.first_name ?? user.first_name,
       last_name: body.last_name ?? user.last_name,
       phone: body.phone ?? user.phone,
-      // photo: body.photo ?? user.photo,
       is_admin: body.is_admin ?? user.is_admin,
-    };
+    });
 
-    await userRepo.update(id, updateData);
-    const updatedUser = await userRepo.findOne({ where: { id } });
+    // Se veio endereço no formato da API de CEP
+    if (address) {
+      const formattedAddress = {
+        street: address.logradouro,
+        number: address.number ?? "",
+        complement: address.complemento ?? "",
+        neighborhood: address.bairro,
+        city: address.localidade,
+        state: address.uf,
+        zip_code: address.cep,
+        is_default: true,
+        user_id: id,
+      };
+
+      const existingAddress = user.addresses?.[0];
+      if (existingAddress) {
+        await addressRepo.update(existingAddress.id, formattedAddress);
+      } else {
+        const newAddress = addressRepo.create(formattedAddress);
+        await addressRepo.save(newAddress);
+      }
+    }
+
+    const updatedUser = await userRepo.findOne({
+      where: { id },
+      relations: ["addresses", "cart_items", "orders"],
+    });
 
     return reply.send({ success: true, data: updatedUser });
   } catch (error) {
+    console.error(error);
     return reply
       .status(500)
       .send({ success: false, error: (error as Error).message });

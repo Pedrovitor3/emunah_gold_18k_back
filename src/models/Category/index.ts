@@ -1,10 +1,17 @@
 // src/models/Category.ts
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
-import { Product } from '../Product';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+} from "typeorm";
+import { Product } from "../Product";
 
-@Entity('categories')
+@Entity("categories")
 export class Category {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column()
@@ -12,9 +19,6 @@ export class Category {
 
   @Column({ nullable: true })
   description?: string;
-
-  @Column({ unique: true })
-  slug: string;
 
   @Column({ default: true })
   is_active: boolean;
@@ -26,6 +30,6 @@ export class Category {
   updated_at: Date;
 
   // Relacionamentos
-  @OneToMany(() => Product, product => product.category)
+  @OneToMany(() => Product, (product) => product.category)
   products: Product[];
 }

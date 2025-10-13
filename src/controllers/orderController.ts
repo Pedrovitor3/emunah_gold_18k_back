@@ -302,7 +302,6 @@ export const getUserOrders = async (
         unit_price: Number(item.unit_price),
         total_price: Number(item.total_price),
         product_name: item.product?.name,
-        product_sku: item.product?.sku,
       })),
     }));
 
@@ -375,7 +374,6 @@ export const getOrderById = async (
         unit_price: Number(item.unit_price),
         total_price: Number(item.total_price),
         product_name: item.product?.name,
-        product_sku: item.product?.sku,
       })),
       payments: order.payments.map((payment) => ({
         id: payment.id,

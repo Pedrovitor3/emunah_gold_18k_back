@@ -3,6 +3,12 @@ import { Product } from "../models/Product";
 import { Category } from "../models/Category";
 import { FastifyReply, FastifyRequest } from "fastify";
 import { PaginatedResponse } from "../models/types";
+import {
+  generateUniqueFileName,
+  uploadToS3,
+  validateFile,
+} from "./uploadController";
+import type { MultipartFile } from "@fastify/multipart";
 
 interface ProductSearchParams {
   page?: string;
@@ -10,9 +16,6 @@ interface ProductSearchParams {
   category?: string;
   featured?: string;
   search?: string;
-}
-interface DeleteProductParams {
-  id: string;
 }
 
 export const getProducts = async (
@@ -36,12 +39,7 @@ export const getProducts = async (
     const queryBuilder = productRepo
       .createQueryBuilder("p")
       .leftJoinAndSelect("p.category", "c")
-      .leftJoinAndSelect("p.images", "pi")
       .where("p.is_active = :active", { active: true });
-
-    if (category) {
-      queryBuilder.andWhere("c.slug = :category", { category });
-    }
 
     if (featured === "true") {
       queryBuilder.andWhere("p.featured = :featured", { featured: true });
@@ -92,7 +90,7 @@ export const getProductById = async (
 
     const product = await productRepo.findOne({
       where: { id: request.params.id, is_active: true },
-      relations: ["category", "images"],
+      relations: ["category"],
     });
 
     if (!product) {
@@ -109,6 +107,7 @@ export const getProductById = async (
       .send({ success: false, error: "Erro interno do servidor" });
   }
 };
+
 export const getCategories = async (
   _request: FastifyRequest,
   reply: FastifyReply
@@ -134,6 +133,7 @@ export const getCategories = async (
       .send({ success: false, error: "Erro interno do servidor" });
   }
 };
+
 export const getFeaturedProducts = async (
   request: FastifyRequest<{ Querystring: { limit?: string } }>,
   reply: FastifyReply
@@ -146,7 +146,7 @@ export const getFeaturedProducts = async (
 
     const products = await productRepo.find({
       where: { is_active: true, featured: true },
-      relations: ["category", "images"],
+      relations: ["category"],
       order: { created_at: "DESC" },
       take: limitNum,
     });
@@ -160,50 +160,117 @@ export const getFeaturedProducts = async (
   }
 };
 
-interface CreateProductBody {
-  category_id: string;
-  name: string;
-  description?: string;
-  sku: string;
-  price: number;
-  weight?: number;
-  gold_purity?: string;
-  stock_quantity?: number;
-  is_active?: boolean;
-  featured?: boolean;
-}
+// ========================================
+// UTILITÁRIO: PROCESSAR UM ARQUIVO
+// ========================================
+
+const processFileUpload = async (file: MultipartFile): Promise<string> => {
+  validateFile(file);
+  const buffer = await file.toBuffer();
+  const filename = generateUniqueFileName(file.filename, "products");
+  const result = await uploadToS3(
+    buffer,
+    filename,
+    file.mimetype,
+    file.filename
+  );
+  return result.url;
+};
+
+// ========================================
+// CRIAR PRODUTO
+// ========================================
 
 export async function createProduct(
   request: FastifyRequest,
   reply: FastifyReply
 ) {
-  const body = request.body as CreateProductBody;
   try {
     const productRepo = AppDataSource.getRepository(Product);
 
-    // Criar instância do produto
+    const fields: Record<string, any> = {};
+    const imageUrls: string[] = [];
+
+    console.log("🔵 Iniciando criação de produto...");
+
+    // Processar multipart
+    let fileCount = 0;
+    let fieldCount = 0;
+
+    for await (const part of request.parts()) {
+      if (part.type === "file") {
+        fileCount++;
+        // É um arquivo - type guard do TypeScript
+        const file = part as MultipartFile;
+        console.log(`📸 Arquivo ${fileCount} recebido:`, {
+          fieldname: file.fieldname,
+          filename: file.filename,
+          mimetype: file.mimetype,
+        });
+
+        try {
+          const url = await processFileUpload(file);
+          imageUrls.push(url);
+          console.log(`✅ Upload ${fileCount} concluído:`, url);
+        } catch (err: any) {
+          console.error(`❌ Erro ao fazer upload de ${file.filename}:`, err);
+          return reply.status(400).send({
+            success: false,
+            error: `Erro no upload de ${file.filename}: ${err.message}`,
+          });
+        }
+      } else {
+        fieldCount++;
+        // É um campo de formulário
+        fields[part.fieldname] = part.value;
+        console.log(`📝 Campo ${fieldCount}:`, part.fieldname, "=", part.value);
+      }
+    }
+
+    console.log(`📊 Resumo: ${fileCount} arquivo(s), ${fieldCount} campo(s)`);
+    console.log("🖼️  URLs das imagens:", imageUrls);
+
+    // Validar campos obrigatórios
+    if (!fields.name || !fields.price || !fields.category_id) {
+      return reply.status(400).send({
+        success: false,
+        error: "Campos obrigatórios: name, price, category_id",
+      });
+    }
+
+    // Criar produto
     const product = productRepo.create({
-      category: { id: body.category_id },
-      name: body.name,
-      description: body.description ?? "",
-      sku: body.sku,
-      price: body.price,
-      weight: body.weight ?? 0,
-      gold_purity: body.gold_purity ?? "",
-      stock_quantity: body.stock_quantity ?? 0,
-      is_active: body.is_active ?? true,
-      featured: body.featured ?? false,
+      category: { id: fields.category_id },
+      name: fields.name,
+      description: fields.description || "",
+      price: Number(fields.price),
+      weight: fields.weight ? Number(fields.weight) : 0,
+      gold_purity: fields.gold_purity || "",
+      stock_quantity: fields.stock_quantity ? Number(fields.stock_quantity) : 0,
+      is_active:
+        fields.is_active !== undefined ? fields.is_active === "true" : true,
+      featured:
+        fields.featured !== undefined ? fields.featured === "true" : false,
+      image_urls: imageUrls,
     });
 
     await productRepo.save(product);
 
+    console.log(`✅ Produto criado: ${product.id} - ${product.name}`);
+
     return reply.status(201).send({ success: true, data: product });
-  } catch (error) {
-    return reply
-      .status(500)
-      .send({ success: false, error: (error as Error).message });
+  } catch (error: any) {
+    console.error("❌ Erro ao criar produto:", error);
+    return reply.status(500).send({
+      success: false,
+      error: error.message || "Erro interno do servidor",
+    });
   }
 }
+
+// ========================================
+// ATUALIZAR PRODUTO
+// ========================================
 
 export async function updateProduct(
   request: FastifyRequest,
@@ -211,87 +278,141 @@ export async function updateProduct(
 ) {
   try {
     const { id } = request.params as { id: string };
-    const body = request.body as CreateProductBody;
     const productRepo = AppDataSource.getRepository(Product);
-    // Verificar se o produto existe
-    const existingProduct = await productRepo.findOne({
-      where: { id: id },
-    });
 
+    console.log(`🔵 Atualizando produto ${id}...`);
+
+    // Buscar produto existente
+    const existingProduct = await productRepo.findOne({ where: { id } });
     if (!existingProduct) {
-      return reply.status(404).send({
-        success: false,
-        error: "Product not found",
-      });
+      return reply
+        .status(404)
+        .send({ success: false, error: "Produto não encontrado" });
     }
 
-    // Preparar dados para atualização
-    const updateData: any = {};
+    console.log("✅ Produto encontrado:", existingProduct.name);
 
-    if (body.category_id !== undefined) {
-      updateData.category = { id: body.category_id };
-    }
-    if (body.name !== undefined) {
-      updateData.name = body.name;
-    }
-    if (body.description !== undefined) {
-      updateData.description = body.description;
-    }
-    if (body.sku !== undefined) {
-      updateData.sku = body.sku;
-    }
-    if (body.price !== undefined) {
-      updateData.price = body.price;
-    }
-    if (body.weight !== undefined) {
-      updateData.weight = body.weight;
-    }
-    if (body.gold_purity !== undefined) {
-      updateData.gold_purity = body.gold_purity;
-    }
-    if (body.stock_quantity !== undefined) {
-      updateData.stock_quantity = body.stock_quantity;
-    }
-    if (body.is_active !== undefined) {
-      updateData.is_active = body.is_active;
-    }
-    if (body.featured !== undefined) {
-      updateData.featured = body.featured;
+    const fields: Record<string, any> = {};
+    const newImageUrls: string[] = [];
+
+    // Robust multipart parsing: só iteramos se for multipart; caso contrário lemos body
+    if (request.isMultipart && request.isMultipart()) {
+      console.log("📦 Processando multipart data...");
+      let fileCount = 0;
+      let fieldCount = 0;
+
+      for await (const part of request.parts()) {
+        if (part.type === "file") {
+          fileCount++;
+          const file = part as MultipartFile;
+          console.log(`📸 Novo arquivo ${fileCount}:`, {
+            fieldname: file.fieldname,
+            filename: file.filename,
+            mimetype: file.mimetype,
+          });
+
+          try {
+            const url = await processFileUpload(file);
+            newImageUrls.push(url);
+            console.log(`✅ Upload ${fileCount} concluído:`, url);
+          } catch (err: any) {
+            console.error(`❌ Erro ao fazer upload de ${file.filename}:`, err);
+            return reply.status(400).send({
+              success: false,
+              error: `Erro no upload: ${err?.message || String(err)}`,
+            });
+          }
+        } else {
+          fieldCount++;
+          // part.value é string
+          fields[part.fieldname] = part.value;
+          console.log(
+            `📝 Campo ${fieldCount}:`,
+            part.fieldname,
+            "=",
+            part.value
+          );
+        }
+      }
+
+      console.log(
+        `📊 Resumo multipart: ${fileCount} arquivo(s), ${fieldCount} campo(s)`
+      );
+    } else {
+      // Não é multipart — tentar ler como JSON/body
+      console.log("🔁 Não multipart — lendo request.body");
+      Object.assign(fields, (request.body as any) || {});
     }
 
-    // Atualizar produto
+    console.log("🔎 Campos recebidos:", fields);
+    console.log("🖼️  Novas imagens recebidas:", newImageUrls);
+
+    // Construir updateData com conversões
+    const updateData: Partial<Product> = {};
+
+    if (fields.name !== undefined) updateData.name = String(fields.name);
+    if (fields.description !== undefined)
+      updateData.description = String(fields.description);
+    if (fields.price !== undefined) updateData.price = Number(fields.price);
+    if (fields.weight !== undefined) updateData.weight = Number(fields.weight);
+    if (fields.gold_purity !== undefined)
+      updateData.gold_purity = String(fields.gold_purity);
+    if (fields.stock_quantity !== undefined)
+      updateData.stock_quantity = Number(fields.stock_quantity);
+    if (fields.is_active !== undefined)
+      updateData.is_active =
+        fields.is_active === "true" || fields.is_active === true;
+    if (fields.featured !== undefined)
+      updateData.featured =
+        fields.featured === "true" || fields.featured === true;
+
+    // Categoria — se você usa uma relação, envie { id: ... }
+    if (fields.category_id !== undefined && fields.category_id !== null) {
+      updateData.category = { id: String(fields.category_id) } as any;
+    }
+
+    // Gerenciar imagens: juntar existentes + novas
+    if (newImageUrls.length > 0) {
+      updateData.image_urls = [
+        ...(existingProduct.image_urls || []),
+        ...newImageUrls,
+      ];
+    }
+
+    console.log("🛠️  Dados para atualizar:", updateData);
+
+    // Usar update (não sobrescreve campos não informados) ou save após merge — preferível update para segurança
     await productRepo.update(id, updateData);
 
-    // Buscar produto atualizado
-    const updatedProduct = await productRepo.findOne({
-      where: { id: id },
-      relations: ["category"], // Incluir categoria se necessário
-    });
+    // Buscar produto atualizado para retornar
+    const updatedProduct = await productRepo.findOne({ where: { id } });
 
-    return reply.status(200).send({
-      success: true,
-      data: updatedProduct,
-    });
-  } catch (error) {
+    console.log(`✅ Produto atualizado: ${id}`);
+
+    return reply.status(200).send({ success: true, data: updatedProduct });
+  } catch (error: any) {
+    console.error("❌ Erro ao atualizar produto:", error);
     return reply.status(500).send({
       success: false,
-      error: (error as Error).message,
+      error: error.message || "Erro interno do servidor",
     });
   }
 }
+
+// ========================================
+// DELETAR PRODUTO (SOFT DELETE)
+// ========================================
 
 export async function deleteProduct(
   request: FastifyRequest,
   reply: FastifyReply
 ) {
-  const { id } = request.params as { id: string };
   try {
+    const { id } = request.params as { id: string };
     const productRepo = AppDataSource.getRepository(Product);
 
     // Verificar se o produto existe
-    const product = await productRepo.findOne({
-      where: { id: id },
-    });
+    const product = await productRepo.findOne({ where: { id } });
 
     if (!product) {
       return reply.status(404).send({
@@ -300,23 +421,21 @@ export async function deleteProduct(
       });
     }
 
-    // Marcar como inativo ao invés de excluir
-    await productRepo.update(id, {
-      is_active: false,
-      // Opcional: adicionar campos de auditoria
-      // deleted_at: new Date()
-    });
+    // Soft delete
+    await productRepo.update(id, { is_active: false });
+
+    console.log(`✅ Produto desativado: ${id}`);
 
     return reply.status(200).send({
       success: true,
       message: "Produto desativado com sucesso",
-      data: { id: id },
+      data: { id },
     });
-  } catch (error) {
-    console.error("Erro ao desativar produto:", error);
+  } catch (error: any) {
+    console.error("❌ Erro ao desativar produto:", error);
     return reply.status(500).send({
       success: false,
-      error: (error as Error).message,
+      error: error.message || "Erro interno do servidor",
     });
   }
 }

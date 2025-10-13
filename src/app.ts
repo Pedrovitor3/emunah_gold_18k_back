@@ -17,7 +17,6 @@ import orderRoutes from "./routes/orders";
 import trackingRoutes from "./routes/tracking";
 import { initializeDatabase } from "./config/database";
 import categoryRoutes from "./routes/category";
-import productImageRoutes from "./routes/productImage";
 import uploadRoutes from "./routes/upload";
 import { pipeline } from "stream";
 import type { FastifyInstance } from "fastify";
@@ -116,7 +115,6 @@ const createApp = async (): Promise<FastifyInstance> => {
   await fastify.register(orderRoutes, { prefix: "/orders" });
   await fastify.register(trackingRoutes, { prefix: "/tracking" });
   await fastify.register(categoryRoutes, { prefix: "/category" });
-  await fastify.register(productImageRoutes, { prefix: "/images" });
   await fastify.register(uploadRoutes, { prefix: "/upload" });
   await fastify.register(userRoutes, { prefix: "/user" });
 

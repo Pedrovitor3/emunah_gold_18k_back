@@ -1,35 +1,49 @@
 // src/models/Address.ts
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
-import { User } from '../User';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from "typeorm";
+import { User } from "../User";
 
-@Entity('addresses')
+@Entity("addresses")
 export class Address {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column()
   user_id: string;
 
   @Column()
-  street: string;
+  cep: string;
 
   @Column()
-  number: string;
+  logradouro: string;
 
   @Column({ nullable: true })
-  complement?: string;
+  complemento?: string;
 
   @Column()
-  neighborhood: string;
+  bairro: string;
 
   @Column()
-  city: string;
+  localidade: string;
 
   @Column()
-  state: string;
+  uf: string;
 
-  @Column()
-  zip_code: string;
+  @Column({ nullable: true })
+  estado?: string;
+
+  @Column({ nullable: true })
+  ddd?: string;
+
+  @Column({ nullable: true })
+  numero?: string;
 
   @Column({ default: false })
   is_default: boolean;
@@ -40,8 +54,7 @@ export class Address {
   @UpdateDateColumn()
   updated_at: Date;
 
-  // Relacionamentos
-  @ManyToOne(() => User, user => user.addresses)
-  @JoinColumn({ name: 'user_id' })
+  @ManyToOne(() => User, (user) => user.addresses)
+  @JoinColumn({ name: "user_id" })
   user: User;
 }
