@@ -15,6 +15,8 @@ import { OrderItem } from "../models/OrderItem";
 import { Product } from "../models/Product";
 import { CartItem } from "../models/CartItem";
 import { Payment } from "../models/Payment";
+import { generatePix } from "./paymentController";
+import type { ShippingAddress } from "../models/types";
 
 /**
  * Interface para criar pedido
@@ -31,6 +33,7 @@ interface CreateOrderData {
     uf: string;
     ddd: string;
   };
+  shipping_cost: number;
   notes?: string;
 }
 
@@ -63,21 +66,6 @@ const generateOrderNumber = (): string => {
 };
 
 /**
- * Simula geração de código PIX
- */
-const generatePixCode = (amount: number): { qrCode: string; code: string } => {
-  const pixCode = `00020126580014br.gov.bcb.pix0136${Math.random()
-    .toString(36)
-    .substring(2, 15)}520400005303986540${amount.toFixed(
-    2
-  )}5802BR5913Emunah Gold 18K6009Sao Paulo62070503***6304`;
-  return {
-    qrCode: `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==`, // Placeholder
-    code: pixCode,
-  };
-};
-
-/**
  * Cria um novo pedido
  */
 export const createOrder = async (
@@ -91,7 +79,8 @@ export const createOrder = async (
     await queryRunner.startTransaction();
 
     const userId = request.user?.userId;
-    const { payment_method, shipping_address, notes } = request.body;
+    const { payment_method, shipping_cost, shipping_address, notes } =
+      request.body;
 
     if (!userId) {
       return reply.status(401).send({
@@ -143,8 +132,7 @@ export const createOrder = async (
       subtotal += Number(item.product.price) * item.quantity;
     }
 
-    const shippingCost = subtotal >= 500 ? 0 : 25; // Frete grátis acima de R$ 500
-    const total = subtotal + shippingCost;
+    const total = subtotal + shipping_cost;
 
     // Criar pedido
     const orderNumber = generateOrderNumber();
@@ -157,7 +145,7 @@ export const createOrder = async (
       payment_method,
       payment_status: PaymentStatus.PENDING,
       subtotal,
-      shipping_cost: shippingCost,
+      shipping_cost,
       total,
       shipping_address,
     };
@@ -192,13 +180,9 @@ export const createOrder = async (
     // Criar registro de pagamento
     let pixData = null;
     if (payment_method === PaymentMethod.PIX) {
-      pixData = generatePixCode(total);
+      const infoPix = await generatePix(total, "Emunah");
+      pixData = infoPix;
     }
-
-    const expiresAt =
-      payment_method === PaymentMethod.PIX
-        ? new Date(Date.now() + 30 * 60 * 1000) // 30 minutos para PIX
-        : null;
 
     // Preparar dados do pagamento
     const paymentData: Partial<Payment> = {
@@ -210,12 +194,8 @@ export const createOrder = async (
 
     // Adicionar dados PIX apenas se existirem
     if (pixData) {
-      paymentData.pix_qr_code = pixData.qrCode;
-      paymentData.pix_code = pixData.code;
-    }
-
-    if (expiresAt) {
-      paymentData.expires_at = expiresAt;
+      paymentData.pix_qr_code = pixData.qrCode ?? "";
+      paymentData.pix_code = pixData.pixCode ?? "";
     }
 
     const payment = paymentRepository.create(paymentData);
@@ -243,12 +223,13 @@ export const createOrder = async (
     };
 
     reply.status(201).send(response);
-  } catch (error) {
+  } catch (error: any) {
     await queryRunner.rollbackTransaction();
-    console.error("Erro ao criar pedido:", error);
+    console.error("Erro ao criar pedido:", error?.message || error);
+    console.error(error?.stack);
     reply.status(500).send({
       success: false,
-      error: "Erro interno do servidor",
+      error: error?.message || "Erro interno do servidor",
     });
   } finally {
     await queryRunner.release();
