@@ -297,11 +297,25 @@ export const getUserOrders = async (
       updated_at: order.updated_at,
       items: order.items.map((item) => ({
         id: item.id,
+        order_id: item.order_id,
         product_id: item.product_id,
         quantity: item.quantity,
         unit_price: Number(item.unit_price),
         total_price: Number(item.total_price),
-        product_name: item.product?.name,
+        // ✅ ADICIONAR objeto product completo
+        product: item.product
+          ? {
+              id: item.product.id,
+              name: item.product.name,
+              description: item.product.description,
+              price: Number(item.product.price),
+              image_urls: item.product.image_urls,
+              stock_quantity: item.product.stock_quantity,
+              category: item.product.category,
+              weight: item.product.weight,
+              is_active: item.product.is_active,
+            }
+          : null,
       })),
     }));
 
