@@ -7,7 +7,6 @@ import { FastifyInstance } from "fastify";
 import {
   getCategories,
   getCategoryById,
-  getCategoryBySlug,
   getActiveCategories,
   createCategory,
   updateCategory,
@@ -22,7 +21,6 @@ export default async function categoryRoutes(fastify: FastifyInstance) {
   // Rotas públicas de categorias
   fastify.get("/", getCategories);
   fastify.get("/active", getActiveCategories);
-  fastify.get("/slug/:slug", getCategoryBySlug);
   fastify.get("/:id", getCategoryById);
 
   // Rotas administrativas (CRUD)
