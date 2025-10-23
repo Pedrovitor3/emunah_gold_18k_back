@@ -10,6 +10,12 @@ interface CategorySearchParams {
   search?: string;
   active?: string;
 }
+interface CreateCategoryBody {
+  name: string;
+  slug: string;
+  description?: string;
+  is_active?: boolean;
+}
 
 export const getCategories = async (
   request: FastifyRequest<{ Querystring: CategorySearchParams }>,
@@ -115,44 +121,6 @@ export const getCategoryById = async (
   }
 };
 
-export const getCategoryBySlug = async (
-  request: FastifyRequest<{ Params: { slug: string } }>,
-  reply: FastifyReply
-) => {
-  try {
-    const categoryRepo = AppDataSource.getRepository(Category);
-
-    const category = await categoryRepo.findOne({
-      relations: ["products"],
-      loadRelationIds: false,
-    });
-
-    if (!category) {
-      return reply
-        .status(404)
-        .send({ success: false, error: "Categoria não encontrada" });
-    }
-
-    // Contar produtos ativos da categoria
-    const productRepo = AppDataSource.getRepository(Product);
-    const productCount = await productRepo.count({
-      where: { category: { id: category.id }, is_active: true },
-    });
-
-    const categoryWithCount = {
-      ...category,
-      product_count: productCount,
-    };
-
-    reply.send({ success: true, data: categoryWithCount });
-  } catch (error) {
-    console.error("Erro ao buscar categoria por slug:", error);
-    reply
-      .status(500)
-      .send({ success: false, error: "Erro interno do servidor" });
-  }
-};
-
 export const getActiveCategories = async (
   _request: FastifyRequest,
   reply: FastifyReply
@@ -178,13 +146,6 @@ export const getActiveCategories = async (
       .send({ success: false, error: "Erro interno do servidor" });
   }
 };
-
-interface CreateCategoryBody {
-  name: string;
-  slug: string;
-  description?: string;
-  is_active?: boolean;
-}
 
 export const createCategory = async (
   request: FastifyRequest,
@@ -213,13 +174,6 @@ export const createCategory = async (
     });
   }
 };
-
-interface UpdateCategoryBody {
-  name?: string;
-  slug?: string;
-  description?: string;
-  is_active?: boolean;
-}
 
 export const updateCategory = async (
   request: FastifyRequest,
