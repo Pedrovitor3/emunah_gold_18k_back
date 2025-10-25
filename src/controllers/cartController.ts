@@ -148,13 +148,14 @@ export const addToCart = async (
       });
     }
 
-    if (product.stock_quantity < quantity) {
-      await queryRunner.rollbackTransaction();
-      return reply.status(400).send({
-        success: false,
-        error: "Quantidade solicitada não disponível em estoque",
-      });
-    }
+    //Caso queria limitar a compra apenas a quantidade
+    // if (product.stock_quantity < quantity) {
+    //   await queryRunner.rollbackTransaction();
+    //   return reply.status(400).send({
+    //     success: false,
+    //     error: "Quantidade solicitada não disponível em estoque",
+    //   });
+    // }
 
     // Verificar se o item já existe no carrinho
     const existingItem = await cartItemRepository.findOne({

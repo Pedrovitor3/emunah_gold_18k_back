@@ -16,7 +16,6 @@ import { Product } from "../models/Product";
 import { CartItem } from "../models/CartItem";
 import { Payment } from "../models/Payment";
 import { generatePix } from "./paymentController";
-import type { ShippingAddress } from "../models/types";
 
 /**
  * Interface para criar pedido
@@ -121,13 +120,14 @@ export const createOrder = async (
         });
       }
 
-      if (item.product.stock_quantity < item.quantity) {
-        await queryRunner.rollbackTransaction();
-        return reply.status(400).send({
-          success: false,
-          error: `Produto ${item.product.name} não tem estoque suficiente`,
-        });
-      }
+      //caso valide estoque
+      // if (item.product.stock_quantity < item.quantity) {
+      //   await queryRunner.rollbackTransaction();
+      //   return reply.status(400).send({
+      //     success: false,
+      //     error: `Produto ${item.product.name} não tem estoque suficiente`,
+      //   });
+      // }
 
       subtotal += Number(item.product.price) * item.quantity;
     }

@@ -67,8 +67,8 @@ export async function generatePix(value: number, description: string) {
     const qrCodePix = QrCodePix({
       version: "01",
       key: "+5562998130462", // Chave com +55 para telefone
-      name: "PEDRO VITOR DA SILVA", // Nome completo, sem acentos
-      city: "GOIANIA", // Sem acento
+      name: "Pedro Vitor Gouveia do Carmo", // Nome completo, sem acentos
+      city: "Goiania", // Sem acento
       message: description || "Pagamento", // Mensagem sem caracteres especiais
       value: Number(value.toFixed(2)), // Garantir 2 casas decimais
       transactionId: transactionId,
