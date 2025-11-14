@@ -12,7 +12,7 @@
     "clean": "rm -rf dist",
     "typeorm": "typeorm-ts-node-commonjs",
     "migration:generate": "npm run typeorm -- migration:generate -d src/config/database.ts",
-    "migration:run": "npm run typeorm -- migration:run -d src/config/database.ts",
+    "migration:run": "typeorm-ts-node-commonjs migration:run -d src/config/database.ts",
     "migration:revert": "npm run typeorm -- migration:revert -d src/config/database.ts",
     "schema:drop": "npm run typeorm -- schema:drop -d src/config/database.ts",
     "schema:sync": "npm run typeorm -- schema:sync -d src/config/database.ts"
