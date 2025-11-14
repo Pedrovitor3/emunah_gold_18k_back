@@ -166,16 +166,16 @@ export const addToCart = async (
       // Atualizar quantidade do item existente
       const newQuantity = existingItem.quantity + quantity;
 
-      if (product.stock_quantity < newQuantity) {
-        await queryRunner.rollbackTransaction();
-        return reply.status(400).send({
-          success: false,
-          error: "Quantidade total solicitada não disponível em estoque",
-        });
-      }
+      // if (product.stock_quantity < newQuantity) {
+      //   await queryRunner.rollbackTransaction();
+      //   return reply.status(400).send({
+      //     success: false,
+      //     error: "Quantidade total solicitada não disponível em estoque",
+      //   });
+      // }
 
-      existingItem.quantity = newQuantity;
-      existingItem.updated_at = new Date();
+      // existingItem.quantity = newQuantity;
+      // existingItem.updated_at = new Date();
       await queryRunner.manager.save(existingItem);
     } else {
       // Inserir novo item no carrinho

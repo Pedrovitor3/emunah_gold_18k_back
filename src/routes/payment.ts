@@ -5,7 +5,12 @@
 
 import { FastifyInstance } from "fastify";
 import { authenticateToken } from "../middleware/auth";
-import { createCheckoutSession, createPixPayment, verifyCheckoutSession } from "../controllers/paymentController";
+import {
+  createCheckoutSession,
+  createPaymentIntent,
+  createPixPayment,
+  verifyCheckoutSession,
+} from "../controllers/paymentController";
 
 /**
  * Plugin de rotas de pedidos
@@ -16,12 +21,15 @@ export default async function paymentRoutes(fastify: FastifyInstance) {
 
   fastify.post("/pix", createPixPayment);
 
-  fastify.post('/stripe/checkout', { 
-    handler: createCheckoutSession
+  fastify.post("/stripe/checkout", {
+    handler: createCheckoutSession,
   });
-  
+  fastify.post("/stripe/payment-intent", {
+    handler: createPaymentIntent,
+  });
+
   // Verificar status da sessão
-  fastify.get('/stripe/verify', { 
-    handler: verifyCheckoutSession
+  fastify.get("/stripe/verify", {
+    handler: verifyCheckoutSession,
   });
 }

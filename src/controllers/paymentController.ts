@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { QrCodePix } from "qrcode-pix";
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 export async function createPixPayment(
   req: FastifyRequest,
@@ -94,13 +94,12 @@ export async function generatePix(value: number, description: string) {
   }
 }
 
-
 type StripeCheckoutRequest = {
   amount: number;
   email: string;
   name: string;
   orderId: string;
-}
+};
 
 export const createCheckoutSession = async (
   request: FastifyRequest<{ Body: StripeCheckoutRequest }>,
@@ -111,9 +110,9 @@ export const createCheckoutSession = async (
   try {
     // Validar variável de ambiente
     const frontendUrl = process.env.FRONTEND_URL;
-    
+
     if (!frontendUrl) {
-      throw new Error('FRONTEND_URL environment variable is not configured');
+      throw new Error("FRONTEND_URL environment variable is not configured");
     }
 
     // Garantir que a URL tem o protocolo
@@ -123,11 +122,11 @@ export const createCheckoutSession = async (
 
     // Criar Checkout Session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: ["card"],
       line_items: [
         {
           price_data: {
-            currency: 'brl',
+            currency: "brl",
             product_data: {
               name: `Pedido #${orderId}`,
               description: `Pagamento do pedido ${orderId}`,
@@ -137,7 +136,7 @@ export const createCheckoutSession = async (
           quantity: 1,
         },
       ],
-      mode: 'payment',
+      mode: "payment",
       success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/cart`,
       customer_email: email,
@@ -155,13 +154,13 @@ export const createCheckoutSession = async (
       },
     });
   } catch (err: any) {
-    console.error('Error creating checkout session:', err);
-    
-    let message = 'An error occurred while creating checkout session.';
-    
-    if (err.type === 'StripeInvalidRequestError') {
+    console.error("Error creating checkout session:", err);
+
+    let message = "An error occurred while creating checkout session.";
+
+    if (err.type === "StripeInvalidRequestError") {
       message = err.message;
-    } else if (err.type === 'StripeCardError') {
+    } else if (err.type === "StripeCardError") {
       message = err.message;
     } else if (err.code) {
       message = err.message;
@@ -172,7 +171,59 @@ export const createCheckoutSession = async (
       error: message,
     });
   }
-}
+};
+
+export const createPaymentIntent = async (
+  request: FastifyRequest<{
+    Body: {
+      amount: number;
+      currency?: string;
+      email?: string;
+      name?: string;
+      orderId?: string;
+    };
+  }>,
+  reply: FastifyReply
+) => {
+  try {
+    const { amount, currency = "brl", email, name, orderId } = request.body;
+
+    if (!amount || Number.isNaN(Number(amount))) {
+      return reply
+        .status(400)
+        .send({ success: false, error: "Invalid amount" });
+    }
+
+    const amountInCents = Math.round(Number(amount) * 100); // atenção: dígito a dígito
+    if (amountInCents <= 0) {
+      return reply
+        .status(400)
+        .send({ success: false, error: "Amount must be > 0" });
+    }
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amountInCents,
+      currency,
+      receipt_email: email,
+      description: `Pedido #${orderId ?? "unknown"}`,
+      metadata: {
+        orderId: orderId ?? "",
+        customerName: name ?? "",
+      },
+    });
+
+    return reply.send({
+      success: true,
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+    });
+  } catch (err: any) {
+    console.error("createPaymentIntent error", err);
+    return reply
+      .status(500)
+      .send({ success: false, error: err.message ?? "Server error" });
+  }
+};
 
 // Nova rota para verificar o status do pagamento
 export const verifyCheckoutSession = async (
@@ -194,10 +245,10 @@ export const verifyCheckoutSession = async (
       },
     });
   } catch (err: any) {
-    console.error('Error verifying session:', err);
+    console.error("Error verifying session:", err);
     reply.status(400).send({
       success: false,
       error: err.message,
     });
   }
-}
+};
