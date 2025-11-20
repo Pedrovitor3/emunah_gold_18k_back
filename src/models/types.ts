@@ -1,9 +1,4 @@
 /**
- * Tipos TypeScript para o projeto Emunah Gold 18K
- * Define interfaces e tipos para todas as entidades do sistema
- */
-
-/**
  * Interface para usuário
  */
 export interface User {

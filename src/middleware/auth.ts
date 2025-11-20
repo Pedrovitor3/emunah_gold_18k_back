@@ -1,16 +1,11 @@
-/**
- * Middleware de autenticação
- * Emunah Gold 18K - Backend
- */
-
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { extractTokenFromHeader, verifyToken } from '../utils/auth';
-import { JwtPayload } from '../models/types';
+import { FastifyRequest, FastifyReply } from "fastify";
+import { extractTokenFromHeader, verifyToken } from "../utils/auth";
+import { JwtPayload } from "../models/types";
 
 /**
  * Estende o tipo FastifyRequest para incluir user
  */
-declare module 'fastify' {
+declare module "fastify" {
   interface FastifyRequest {
     user?: JwtPayload | undefined;
   }
@@ -32,7 +27,7 @@ export const authenticateToken = async (
     if (!token) {
       return reply.status(401).send({
         success: false,
-        error: 'Token de acesso requerido'
+        error: "Token de acesso requerido",
       });
     }
 
@@ -41,7 +36,7 @@ export const authenticateToken = async (
   } catch (error) {
     return reply.status(401).send({
       success: false,
-      error: 'Token inválido ou expirado'
+      error: "Token inválido ou expirado",
     });
   }
 };
@@ -58,7 +53,7 @@ export const requireAdmin = async (
   if (!request.user?.isAdmin) {
     return reply.status(403).send({
       success: false,
-      error: 'Acesso negado. Privilégios de administrador requeridos.'
+      error: "Acesso negado. Privilégios de administrador requeridos.",
     });
   }
 };
@@ -85,4 +80,3 @@ export const optionalAuth = async (
     request.user = undefined;
   }
 };
-

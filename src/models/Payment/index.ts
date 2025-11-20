@@ -1,18 +1,24 @@
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from "typeorm";
+import { PaymentMethod, PaymentStatus } from "../types";
+import { Order } from "../Order";
 
-// src/models/Payment.ts
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
-import { PaymentMethod, PaymentStatus } from '../types';
-import { Order } from '../Order';
-
-@Entity('payments')
+@Entity("payments")
 export class Payment {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column()
   order_id: string;
 
-  @Column({ type: 'enum', enum: PaymentMethod })
+  @Column({ type: "enum", enum: PaymentMethod })
   payment_method: PaymentMethod;
 
   @Column({ nullable: true })
@@ -21,10 +27,10 @@ export class Payment {
   @Column({ nullable: true })
   provider_payment_id?: string;
 
-  @Column('decimal', { precision: 10, scale: 2 })
+  @Column("decimal", { precision: 10, scale: 2 })
   amount: number;
 
-  @Column({ type: 'enum', enum: PaymentStatus, default: PaymentStatus.PENDING })
+  @Column({ type: "enum", enum: PaymentStatus, default: PaymentStatus.PENDING })
   status?: PaymentStatus;
 
   @Column({ nullable: true })
@@ -46,7 +52,7 @@ export class Payment {
   updated_at: Date;
 
   // Relacionamentos
-  @ManyToOne(() => Order, order => order.payments)
-  @JoinColumn({ name: 'order_id' })
+  @ManyToOne(() => Order, (order) => order.payments)
+  @JoinColumn({ name: "order_id" })
   order: Order;
 }

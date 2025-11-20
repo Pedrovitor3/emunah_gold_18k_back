@@ -1,6 +1,5 @@
-// src/config/s3.ts
 import dotenv from "dotenv";
-dotenv.config(); // <- garante que .env seja lido quando esse módulo for importado
+dotenv.config();
 
 import { S3Client } from "@aws-sdk/client-s3";
 

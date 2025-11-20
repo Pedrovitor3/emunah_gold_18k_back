@@ -1,4 +1,3 @@
-// src/models/Category.ts
 import {
   Entity,
   PrimaryGeneratedColumn,

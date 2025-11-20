@@ -1,8 +1,3 @@
-/**
- * Utilitários de autenticação
- * Emunah Gold 18K - Backend
- */
-
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { JwtPayload } from "../models/types";

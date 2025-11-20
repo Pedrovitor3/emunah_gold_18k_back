@@ -7,10 +7,6 @@ export const CorreioAutenticContact = async (
   reply: FastifyReply
 ) => {
   try {
-    // const username = process.env.CORREIOS_USER || "60926586000141";
-    // const password =
-    //   process.env.CORREIOS_PASS || "BHuFhTkMO0hZte7wvJC9M9ToBe09ji0IwRAQGUDR";
-    // const contratoNumero = process.env.CORREIOS_CONTRATO || "9912722012";
     const username = "60926586000141";
     const password = "BHuFhTkMO0hZte7wvJC9M9ToBe09ji0IwRAQGUDR";
     const contratoNumero = "9912722012";

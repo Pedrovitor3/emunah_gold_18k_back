@@ -1,4 +1,3 @@
-// src/types/shipping.types.ts
 export interface ShippingAddress {
   street: string;
   number: string;

@@ -1,14 +1,10 @@
-/**
- * Rotas de pedidos
- * Emunah Gold 18K - Backend
- */
-
 import { FastifyInstance } from "fastify";
 import {
   createOrder,
   getUserOrders,
   getOrderById,
   confirmPayment,
+  updateOrder,
 } from "../controllers/orderController";
 import { authenticateToken } from "../middleware/auth";
 
@@ -21,6 +17,7 @@ export default async function orderRoutes(fastify: FastifyInstance) {
 
   // Rotas de pedidos
   fastify.post("/", createOrder);
+  fastify.put("/:orderId", updateOrder);
   fastify.get("/", getUserOrders);
   fastify.get("/:id", getOrderById);
   fastify.post("/:id/confirm-payment", confirmPayment);

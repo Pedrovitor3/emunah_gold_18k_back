@@ -1,7 +1,3 @@
-/**
- * Configuração da conexão com o banco de dados PostgreSQL usando TypeORM
- * Emunah Gold 18K - Backend
- */
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 import dotenv from "dotenv";

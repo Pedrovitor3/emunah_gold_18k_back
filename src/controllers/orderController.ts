@@ -1,8 +1,3 @@
-/**
- * Controller de pedidos
- * Emunah Gold 18K - Backend
- */
-
 import { FastifyRequest, FastifyReply } from "fastify";
 import { AppDataSource } from "../config/database";
 import {
@@ -16,6 +11,7 @@ import { Product } from "../models/Product";
 import { CartItem } from "../models/CartItem";
 import { Payment } from "../models/Payment";
 import { generatePix } from "./paymentController";
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 /**
  * Interface para criar pedido
@@ -34,6 +30,23 @@ interface CreateOrderData {
   };
   shipping_cost: number;
   notes?: string;
+}
+
+interface PaymentResponse {
+  orderId: string;
+  orderNumber: string;
+  total: number;
+  payment_method: string;
+  pix?: {
+    pixCode: string;
+    qrCode: string;
+    transactionId: string;
+    expiresAt: string;
+  };
+  stripe?: {
+    clientSecret: string;
+    paymentIntentId: string;
+  };
 }
 
 /**
@@ -90,7 +103,6 @@ export const createOrder = async (
 
     // Repositórios
     const cartItemRepository = queryRunner.manager.getRepository(CartItem);
-    const productRepository = queryRunner.manager.getRepository(Product);
     const orderRepository = queryRunner.manager.getRepository(Order);
     const orderItemRepository = queryRunner.manager.getRepository(OrderItem);
     const paymentRepository = queryRunner.manager.getRepository(Payment);
@@ -120,15 +132,6 @@ export const createOrder = async (
         });
       }
 
-      //caso valide estoque
-      // if (item.product.stock_quantity < item.quantity) {
-      //   await queryRunner.rollbackTransaction();
-      //   return reply.status(400).send({
-      //     success: false,
-      //     error: `Produto ${item.product.name} não tem estoque suficiente`,
-      //   });
-      // }
-
       subtotal += Number(item.product.price) * item.quantity;
     }
 
@@ -137,7 +140,6 @@ export const createOrder = async (
     // Criar pedido
     const orderNumber = generateOrderNumber();
 
-    // Preparar dados do pedido
     const orderData: Partial<Order> = {
       user_id: userId,
       order_number: orderNumber,
@@ -150,7 +152,6 @@ export const createOrder = async (
       shipping_address,
     };
 
-    // Adicionar notes apenas se existir
     if (notes) {
       orderData.notes = notes;
     }
@@ -172,19 +173,14 @@ export const createOrder = async (
 
       await queryRunner.manager.save(orderItem);
 
-      // Atualizar estoque
       item.product.stock_quantity -= item.quantity;
       await queryRunner.manager.save(item.product);
     }
 
-    // Criar registro de pagamento
+    // ===== PROCESSAR PAGAMENTO - PADRONIZADO =====
     let pixData = null;
-    if (payment_method === PaymentMethod.PIX) {
-      const infoPix = await generatePix(total, "Emunah");
-      pixData = infoPix;
-    }
+    let stripeData = null;
 
-    // Preparar dados do pagamento
     const paymentData: Partial<Payment> = {
       order_id: savedOrder.id,
       payment_method,
@@ -192,10 +188,29 @@ export const createOrder = async (
       status: PaymentStatus.PENDING,
     };
 
-    // Adicionar dados PIX apenas se existirem
-    if (pixData) {
-      paymentData.pix_qr_code = pixData.qrCode ?? "";
-      paymentData.pix_code = pixData.pixCode ?? "";
+    // PIX - Gerar QR Code
+    if (payment_method === PaymentMethod.PIX) {
+      const infoPix = await generatePix(total, "Emunah");
+      pixData = infoPix;
+      paymentData.pix_qr_code = infoPix.qrCode ?? "";
+      paymentData.pix_code = infoPix.pixCode ?? "";
+    }
+
+    // STRIPE - Criar PaymentIntent
+    if (payment_method === PaymentMethod.CREDIT_CARD) {
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(total * 100),
+        currency: "brl",
+        description: `Pedido #${orderNumber}`,
+        metadata: {
+          orderId: savedOrder.id,
+        },
+      });
+      stripeData = {
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+      };
+      paymentData.payment_provider = paymentIntent.id;
     }
 
     const payment = paymentRepository.create(paymentData);
@@ -206,18 +221,24 @@ export const createOrder = async (
 
     await queryRunner.commitTransaction();
 
-    const response: ApiResponse<{
-      orderId: string;
-      orderNumber: string;
-      total: number;
-      pixData?: typeof pixData;
-    }> = {
+    // ===== RESPOSTA PADRONIZADA PARA AMBOS OS MÉTODOS =====\
+
+    const response: ApiResponse<PaymentResponse> = {
       success: true,
       data: {
         orderId: savedOrder.id,
         orderNumber,
         total,
-        ...(pixData && { pixData }),
+        payment_method,
+        ...(pixData && {
+          pixData,
+        }),
+        ...(stripeData && {
+          stripe: {
+            clientSecret: stripeData.clientSecret,
+            paymentIntentId: stripeData.paymentIntentId,
+          },
+        }),
       },
       message: "Pedido criado com sucesso",
     };
@@ -227,6 +248,156 @@ export const createOrder = async (
     await queryRunner.rollbackTransaction();
     console.error("Erro ao criar pedido:", error?.message || error);
     console.error(error?.stack);
+    reply.status(500).send({
+      success: false,
+      error: error?.message || "Erro interno do servidor",
+    });
+  } finally {
+    await queryRunner.release();
+  }
+};
+
+interface UpdateOrderData {
+  payment_method?: PaymentMethod;
+  notes?: string;
+}
+
+export const updateOrder = async (
+  request: FastifyRequest<{
+    Params: { orderId: string };
+    Body: UpdateOrderData;
+  }>,
+  reply: FastifyReply
+): Promise<void> => {
+  const queryRunner = AppDataSource.createQueryRunner();
+
+  try {
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    const userId = request.user?.userId;
+    const { orderId } = request.params;
+    const { payment_method, notes } = request.body;
+
+    if (!userId) {
+      return reply.status(401).send({
+        success: false,
+        error: "Usuário não autenticado",
+      });
+    }
+
+    const orderRepository = queryRunner.manager.getRepository(Order);
+    const paymentRepository = queryRunner.manager.getRepository(Payment);
+
+    // Buscar pedido
+    const order = await orderRepository.findOne({
+      where: { id: orderId, user_id: userId },
+      relations: ["items"],
+    });
+
+    if (!order) {
+      await queryRunner.rollbackTransaction();
+      return reply.status(404).send({
+        success: false,
+        error: "Pedido não encontrado",
+      });
+    }
+
+    // ✅ Só permite atualizar se pendente
+    if (order.payment_status !== PaymentStatus.PENDING) {
+      await queryRunner.rollbackTransaction();
+      return reply.status(400).send({
+        success: false,
+        error: "Apenas pedidos pendentes podem ser atualizados",
+      });
+    }
+
+    // Atualizar método de pagamento
+    if (payment_method) {
+      order.payment_method = payment_method;
+
+      // Buscar pagamento relacionado
+      const payment = await paymentRepository.findOne({
+        where: { order_id: orderId },
+      });
+
+      if (payment) {
+        payment.payment_method = payment_method;
+        console.log(order);
+        console.log(order.total);
+        // ✅ SE FOR PIX - GERAR NOVO QR CODE
+        if (payment_method === PaymentMethod.PIX) {
+          console.log("TYPE OF VALUE:", typeof order.total, order.total);
+
+          const infoPix = await generatePix(order.total, "Emunah");
+          console.log("infoPix", infoPix);
+          payment.pix_qr_code = infoPix.qrCode ?? "";
+          payment.pix_code = infoPix.pixCode ?? "";
+        } else {
+          // SE FOR CARTÃO - LIMPAR DADOS PIX
+          payment.pix_qr_code = "";
+          payment.pix_code = "";
+        }
+
+        await queryRunner.manager.save(payment);
+      }
+    }
+
+    // Atualizar notas
+    if (notes !== undefined) {
+      order.notes = notes;
+    }
+
+    await queryRunner.manager.save(order);
+
+    await queryRunner.commitTransaction();
+
+    // ✅ RETORNAR DADOS PARA PAGAR
+    let paymentData: any = {
+      orderId: order.id,
+      payment_method: order.payment_method,
+      total: order.total,
+    };
+
+    // Se PIX - retornar QR Code
+    if (order.payment_method === PaymentMethod.PIX) {
+      const payment = await paymentRepository.findOne({
+        where: { order_id: orderId },
+      });
+
+      paymentData.pix = {
+        pixCode: payment?.pix_code,
+        qrCode: payment?.pix_qr_code,
+        transactionId: payment?.id || orderId,
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      };
+    }
+
+    // Se Cartão - retornar client secret
+    if (order.payment_method === PaymentMethod.CREDIT_CARD) {
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(order.total * 100),
+        currency: "brl",
+        description: `Pedido #${order.id}`,
+        metadata: {
+          orderId: order.id,
+        },
+      });
+
+      paymentData.stripe = {
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+      };
+    }
+
+    reply.send({
+      success: true,
+      data: paymentData,
+      message: "Pedido atualizado com sucesso",
+    });
+  } catch (error: any) {
+    await queryRunner.rollbackTransaction();
+    console.error("Erro ao atualizar pedido:", error);
     reply.status(500).send({
       success: false,
       error: error?.message || "Erro interno do servidor",

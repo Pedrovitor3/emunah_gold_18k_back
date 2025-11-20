@@ -1,8 +1,3 @@
-/**
- * Rotas do carrinho de compras
- * Emunah Gold 18K - Backend
- */
-
 import { FastifyInstance } from "fastify";
 import {
   getCartItems,

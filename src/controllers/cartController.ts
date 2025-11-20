@@ -1,8 +1,3 @@
-/**
- * Controller do carrinho de compras
- * Emunah Gold 18K - Backend
- */
-
 import { FastifyRequest, FastifyReply } from "fastify";
 import { AppDataSource } from "../config/database";
 import { CartItem } from "../models/CartItem";

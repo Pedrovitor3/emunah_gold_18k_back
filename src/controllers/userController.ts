@@ -1,4 +1,3 @@
-// src/controllers/UserController.ts
 import { FastifyRequest, FastifyReply } from "fastify";
 import { AppDataSource } from "../config/database";
 import { User } from "../models/User";

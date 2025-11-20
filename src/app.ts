@@ -1,8 +1,3 @@
-/**
- * Aplicação principal do backend
- * Emunah Gold 18K - Backend
- */
-
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import dotenv from "dotenv";

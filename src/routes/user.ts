@@ -1,4 +1,3 @@
-// src/routes/userRoutes.ts
 import { FastifyInstance } from "fastify";
 import {
   getUserById,

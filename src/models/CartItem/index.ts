@@ -1,11 +1,18 @@
-// src/models/CartItem.ts
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
-import { User } from '../User';
-import { Product } from '../Product';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from "typeorm";
+import { User } from "../User";
+import { Product } from "../Product";
 
-@Entity('cart_items')
+@Entity("cart_items")
 export class CartItem {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column()
@@ -24,11 +31,11 @@ export class CartItem {
   updated_at: Date;
 
   // Relacionamentos
-  @ManyToOne(() => User, user => user.cart_items)
-  @JoinColumn({ name: 'user_id' })
+  @ManyToOne(() => User, (user) => user.cart_items)
+  @JoinColumn({ name: "user_id" })
   user: User;
 
-  @ManyToOne(() => Product, product => product.cart_items)
-  @JoinColumn({ name: 'product_id' })
+  @ManyToOne(() => Product, (product) => product.cart_items)
+  @JoinColumn({ name: "product_id" })
   product: Product;
 }

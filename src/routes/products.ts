@@ -1,8 +1,3 @@
-/**
- * Rotas de produtos
- * Emunah Gold 18K - Backend
- */
-
 import { FastifyInstance } from "fastify";
 import {
   getProducts,

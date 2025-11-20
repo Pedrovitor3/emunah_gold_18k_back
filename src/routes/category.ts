@@ -1,8 +1,3 @@
-/**
- * Rotas de categorias
- * Emunah Gold 18K - Backend
- */
-
 import { FastifyInstance } from "fastify";
 import {
   getCategories,

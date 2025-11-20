@@ -1,8 +1,3 @@
-/**
- * Controller de upload de arquivos - Versão Unificada
- * Emunah Gold 18K - Backend
- */
-
 import { FastifyRequest, FastifyReply } from "fastify";
 import {
   S3Client,

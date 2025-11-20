@@ -1,11 +1,16 @@
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from "typeorm";
+import { Order } from "../Order";
 
-// src/models/OrderTracking.ts
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
-import { Order } from '../Order';
-
-@Entity('order_tracking')
+@Entity("order_tracking")
 export class OrderTracking {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column()
@@ -27,7 +32,7 @@ export class OrderTracking {
   created_at: Date;
 
   // Relacionamentos
-  @ManyToOne(() => Order, order => order.tracking)
-  @JoinColumn({ name: 'order_id' })
+  @ManyToOne(() => Order, (order) => order.tracking)
+  @JoinColumn({ name: "order_id" })
   order: Order;
 }

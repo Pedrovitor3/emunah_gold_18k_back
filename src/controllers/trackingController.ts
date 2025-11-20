@@ -1,8 +1,3 @@
-/**
- * Controller de rastreamento de pedidos
- * Emunah Gold 18K - Backend
- */
-
 import { FastifyRequest, FastifyReply } from "fastify";
 import { AppDataSource } from "../config/database";
 import { Order } from "../models/Order";
