@@ -323,14 +323,10 @@ export const updateOrder = async (
 
       if (payment) {
         payment.payment_method = payment_method;
-        console.log(order);
-        console.log(order.total);
+
         // ✅ SE FOR PIX - GERAR NOVO QR CODE
         if (payment_method === PaymentMethod.PIX) {
-          console.log("TYPE OF VALUE:", typeof order.total, order.total);
-
           const infoPix = await generatePix(order.total, "Emunah");
-          console.log("infoPix", infoPix);
           payment.pix_qr_code = infoPix.qrCode ?? "";
           payment.pix_code = infoPix.pixCode ?? "";
         } else {

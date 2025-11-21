@@ -18,6 +18,7 @@ import type { FastifyInstance } from "fastify";
 import userRoutes from "./routes/user";
 import correiosRoutes from "./routes/correios";
 import paymentRoutes from "./routes/payment";
+import addressRoutes from "./routes/address";
 const fs = require("fs");
 const util = require("util");
 const pump = util.promisify(pipeline);
@@ -116,6 +117,7 @@ const createApp = async (): Promise<FastifyInstance> => {
   await fastify.register(userRoutes, { prefix: "/user" });
   await fastify.register(correiosRoutes, { prefix: "/correios" });
   await fastify.register(paymentRoutes, { prefix: "/payment" });
+  await fastify.register(addressRoutes, { prefix: "/address" });
 
   // Rota 404 personalizada
   fastify.setNotFoundHandler(

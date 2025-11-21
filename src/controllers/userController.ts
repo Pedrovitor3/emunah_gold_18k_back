@@ -2,7 +2,6 @@ import { FastifyRequest, FastifyReply } from "fastify";
 import { AppDataSource } from "../config/database";
 import { User } from "../models/User";
 import bcrypt from "bcryptjs";
-import { Address } from "../models/Address";
 
 interface CreateUserBody {
   email: string;
@@ -10,7 +9,6 @@ interface CreateUserBody {
   first_name: string;
   last_name: string;
   phone?: string;
-  photo?: string;
   is_admin?: boolean;
 }
 
@@ -18,10 +16,13 @@ interface UpdateUserBody {
   first_name?: string;
   last_name?: string;
   phone?: string | null;
-  photo?: string | null;
   is_admin?: boolean;
 }
 
+/**
+ * GET /users
+ * Retorna todos os usuários com suas relações
+ */
 export const getUsers = async (
   _request: FastifyRequest,
   reply: FastifyReply
@@ -39,6 +40,10 @@ export const getUsers = async (
   }
 };
 
+/**
+ * GET /users/:id
+ * Retorna um usuário específico com suas relações
+ */
 export const getUserById = async (
   request: FastifyRequest<{ Params: { id: string } }>,
   reply: FastifyReply
@@ -61,14 +66,26 @@ export const getUserById = async (
   }
 };
 
+/**
+ * POST /users
+ * Cria um novo usuário
+ */
 export const createUser = async (
   request: FastifyRequest<{ Body: CreateUserBody }>,
   reply: FastifyReply
 ) => {
   try {
-    const { email, password, first_name, last_name, phone, photo, is_admin } =
+    const { email, password, first_name, last_name, phone, is_admin } =
       request.body;
     const userRepo = AppDataSource.getRepository(User);
+
+    // Validação básica
+    if (!email || !password || !first_name || !last_name) {
+      return reply.status(400).send({
+        success: false,
+        error: "Email, senha, primeiro nome e último nome são obrigatórios",
+      });
+    }
 
     const existingUser = await userRepo.findOne({ where: { email } });
     if (existingUser)
@@ -84,36 +101,45 @@ export const createUser = async (
       first_name,
       last_name,
       phone: phone || null,
-      // photo: photo || null,
       is_admin: is_admin || false,
     });
 
     await userRepo.save(user);
-    return reply.status(201).send({ success: true, data: user });
+
+    return reply.status(201).send({
+      success: true,
+      data: user,
+      message: "Usuário criado com sucesso",
+    });
   } catch (error) {
+    console.error("Erro ao criar usuário:", error);
     return reply
       .status(500)
       .send({ success: false, error: (error as Error).message });
   }
 };
 
+/**
+ * PUT /users/:id
+ * Atualiza dados do usuário
+ * Endereço é gerenciado por endpoints separados
+ */
 export const updateUser = async (
   request: FastifyRequest<{
     Params: { id: string };
-    Body: UpdateUserBody & { address?: any };
+    Body: UpdateUserBody;
   }>,
   reply: FastifyReply
 ) => {
   try {
     const { id } = request.params;
-    const { address, ...body } = request.body;
+    const body = request.body;
 
     const userRepo = AppDataSource.getRepository(User);
-    const addressRepo = AppDataSource.getRepository(Address);
 
     const user = await userRepo.findOne({
       where: { id },
-      relations: ["addresses"],
+      relations: ["addresses", "cart_items", "orders"],
     });
 
     if (!user) {
@@ -122,51 +148,42 @@ export const updateUser = async (
         .send({ success: false, error: "Usuário não encontrado" });
     }
 
-    // Atualiza dados básicos do usuário
-    await userRepo.update(id, {
-      first_name: body.first_name ?? user.first_name,
-      last_name: body.last_name ?? user.last_name,
-      phone: body.phone ?? user.phone,
-      is_admin: body.is_admin ?? user.is_admin,
-    });
+    // Atualiza apenas os campos fornecidos
+    const updateData: Partial<User> = {};
 
-    // Se veio endereço no formato da API de CEP
-    if (address) {
-      const formattedAddress = {
-        street: address.logradouro,
-        number: address.number ?? "",
-        complement: address.complemento ?? "",
-        neighborhood: address.bairro,
-        city: address.localidade,
-        state: address.uf,
-        zip_code: address.cep,
-        is_default: true,
-        user_id: id,
-      };
+    if (body.first_name !== undefined) updateData.first_name = body.first_name;
+    if (body.last_name !== undefined) updateData.last_name = body.last_name;
+    if (body.phone !== undefined) updateData.phone = body.phone;
 
-      const existingAddress = user.addresses?.[0];
-      if (existingAddress) {
-        await addressRepo.update(existingAddress.id, formattedAddress);
-      } else {
-        const newAddress = addressRepo.create(formattedAddress);
-        await addressRepo.save(newAddress);
-      }
+    // is_admin só pode ser atualizado por admin
+    if (body.is_admin !== undefined && request.user?.isAdmin) {
+      updateData.is_admin = body.is_admin;
     }
+
+    await userRepo.update(id, updateData);
 
     const updatedUser = await userRepo.findOne({
       where: { id },
       relations: ["addresses", "cart_items", "orders"],
     });
 
-    return reply.send({ success: true, data: updatedUser });
+    return reply.send({
+      success: true,
+      data: updatedUser,
+      message: "Usuário atualizado com sucesso",
+    });
   } catch (error) {
-    console.error(error);
+    console.error("Erro ao atualizar usuário:", error);
     return reply
       .status(500)
       .send({ success: false, error: (error as Error).message });
   }
 };
 
+/**
+ * DELETE /users/:id
+ * Deleta um usuário
+ */
 export const deleteUser = async (
   request: FastifyRequest<{ Params: { id: string } }>,
   reply: FastifyReply
@@ -181,17 +198,16 @@ export const deleteUser = async (
         .status(404)
         .send({ success: false, error: "Usuário não encontrado" });
 
-    // Marcar como inativo em vez de excluir
-    await userRepo.update(id, {
-      is_admin: false /* opcional: deleted_at: new Date() */,
-    });
+    // Delete completo (ou poderia ser soft delete com deleted_at)
+    await userRepo.delete(id);
 
     return reply.send({
       success: true,
-      message: "Usuário desativado com sucesso",
+      message: "Usuário deletado com sucesso",
       data: { id },
     });
   } catch (error) {
+    console.error("Erro ao deletar usuário:", error);
     return reply
       .status(500)
       .send({ success: false, error: (error as Error).message });
