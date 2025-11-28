@@ -6,10 +6,14 @@ import { initializeDatabase } from "./config/database";
  */
 const start = async (): Promise<void> => {
   try {
+    // Criar aplicação
     const app = await createApp();
 
+    // Configurações do servidor
+    const host = process.env.HOST || "0.0.0.0";
     const port = parseInt(process.env.PORT || "3001");
 
+    // Testar conexão com o banco de dados
     console.log("🔍 Testando conexão com o banco de dados...");
     const dbConnected = await initializeDatabase();
 
@@ -18,13 +22,17 @@ const start = async (): Promise<void> => {
       process.exit(1);
     }
 
-    console.log(`🚀 Iniciando servidor na porta ${port}...`);
+    // Iniciar servidor
+    console.log(`🚀 Iniciando servidor em ${host}:${port}...`);
 
-    await app.listen({ port }); // sem host
+    await app.listen({
+      host,
+      port,
+    });
 
-    console.log(`✅ Servidor rodando na porta ${port}`);
-    console.log(`📊 Health check disponível em /health`);
-    console.log(`📚 API disponível em /api`);
+    console.log(`✅ Servidor rodando em http://${host}:${port}`);
+    console.log(`📊 Health check disponível em http://${host}:${port}/health`);
+    console.log(`📚 API disponível em http://${host}:${port}/api`);
   } catch (error) {
     console.error("❌ Erro ao iniciar servidor:", error);
     process.exit(1);
