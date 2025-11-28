@@ -4,6 +4,7 @@ import {
   createCheckoutSession,
   createPaymentIntent,
   verifyCheckoutSession,
+  createPreference,
 } from "../controllers/paymentController";
 
 /**
@@ -23,5 +24,9 @@ export default async function paymentRoutes(fastify: FastifyInstance) {
   // Verificar status da sessão
   fastify.get("/stripe/verify", {
     handler: verifyCheckoutSession,
+  });
+
+  fastify.post("/create-preference", {
+    handler: createPreference,
   });
 }

@@ -19,6 +19,8 @@ import userRoutes from "./routes/user";
 import correiosRoutes from "./routes/correios";
 import paymentRoutes from "./routes/payment";
 import addressRoutes from "./routes/address";
+import { MercadoPagoConfig, Preference } from 'mercadopago';
+
 const fs = require("fs");
 const util = require("util");
 const pump = util.promisify(pipeline);
@@ -30,7 +32,12 @@ dotenv.config();
  * Cria e configura a instância do Fastify
  */
 const createApp = async (): Promise<FastifyInstance> => {
-  // Criar instância do Fastify com configurações
+  // SDK do Mercado Pago
+// Adicione credenciais
+const client = new MercadoPagoConfig({ accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN_TEST || '' });
+  
+
+// Criar instância do Fastify com configurações
   const fastify = Fastify({
     logger: true,
   });

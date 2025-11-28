@@ -1,4 +1,5 @@
 import { FastifyRequest, FastifyReply } from "fastify";
+import MercadoPagoConfig, { Preference } from "mercadopago";
 import { QrCodePix } from "qrcode-pix";
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
@@ -199,5 +200,54 @@ export const verifyCheckoutSession = async (
       success: false,
       error: err.message,
     });
+  }
+};
+
+// exemplo Fastify (ajustado)
+export const createPreference = async (
+  request: FastifyRequest<{ Body: { amount: number } }>,
+  reply: FastifyReply
+) => {
+  const client = new MercadoPagoConfig({
+    accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN_TEST || "APP_USR-8815269563376943-112617-c1b36e833113f6479812abfc1371fba4-3019249484" // <- usar env
+  });
+
+  console.log(client);
+  const preference = new Preference(client);
+
+  try {
+    const { amount } = request.body;
+    const response = await preference.create({
+      body: {
+        items: [
+          {
+            id: "prod-001",
+            title: "Meu produto",
+            quantity: 1,
+            unit_price: Number(amount) // garantir number
+          }
+        ],
+              back_urls: {
+        success: "https://www.seu-site/success",
+        failure: "https://www.seu-site/failure",
+        pending: "https://www.seu-site/pending"
+      },
+      auto_return: "approved",
+
+      }
+    });
+
+    // response.id é o ID da preferência
+    return reply.send({
+      success: true,
+      id: response.id,
+      init_point: response.init_point,
+      // em sandbox às vezes existe sandbox_init_point
+      sandbox_init_point: (response as any).sandbox_init_point ?? null
+    });
+
+  } catch (err) {
+    console.error(err);
+    return reply.code(500).send({ error: "Erro ao criar preferência" });
   }
 };
