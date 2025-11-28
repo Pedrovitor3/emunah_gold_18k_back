@@ -1,16 +1,18 @@
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 import dotenv from "dotenv";
+import { Pool } from "pg";
 
 dotenv.config();
 
+const databaseURL =
+  process.env.DATABASE_URL ||
+  "postgresql://postgres.vjeqtzjgsehrdiavqpvc:3mun4H2026.@aws-1-us-east-2.pooler.supabase.com:5432/postgres";
+
 export const AppDataSource = new DataSource({
   type: "postgres",
-  host: process.env.DB_HOST || "localhost",
-  port: parseInt(process.env.DB_PORT || "5432"),
-  username: process.env.DB_USER || "emunah_user",
-  password: process.env.DB_PASSWORD || "3mun4h",
-  database: process.env.DB_NAME || "emunah_gold_18k",
+  url: databaseURL,
+  ssl: { rejectUnauthorized: false },
   synchronize: false, // mantenha false em produção
   logging: false,
   entities: [`${__dirname}/../models/**/*.{ts,js}`],
