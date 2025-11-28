@@ -25,10 +25,7 @@ const start = async (): Promise<void> => {
     // Iniciar servidor
     console.log(`🚀 Iniciando servidor em ${host}:${port}...`);
 
-    await app.listen({
-      host,
-      port,
-    });
+    await app.listen({ port });
 
     console.log(`✅ Servidor rodando em http://${host}:${port}`);
     console.log(`📊 Health check disponível em http://${host}:${port}/health`);
