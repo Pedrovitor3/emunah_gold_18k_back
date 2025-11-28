@@ -30,9 +30,7 @@ const start = async (): Promise<void> => {
       port,
     });
 
-    console.log(`✅ Servidor rodando em http://${host}:${port}`);
-    console.log(`📊 Health check disponível em http://${host}:${port}/health`);
-    console.log(`📚 API disponível em http://${host}:${port}/api`);
+    console.log(`📚 API disponível em http://${host}:${port}`);
   } catch (error) {
     console.error("❌ Erro ao iniciar servidor:", error);
     process.exit(1);
